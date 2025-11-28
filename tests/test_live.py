@@ -41,11 +41,11 @@ def vertexai(http_client: httpx.AsyncClient, tmp_path: Path) -> Model:
     from pydantic_ai.providers.google import GoogleProvider
 
     if service_account_path := os.getenv('GOOGLE_APPLICATION_CREDENTIALS'):
-        project_id = json.loads(Path(service_account_path).read_text())['project_id']
+        project_id = json.loads(Path(service_account_path).read_text(encoding='utf-8'))['project_id']
     elif service_account_content := os.getenv('GOOGLE_SERVICE_ACCOUNT_CONTENT'):
         project_id = json.loads(service_account_content)['project_id']
         service_account_path = tmp_path / 'service_account.json'
-        service_account_path.write_text(service_account_content)
+        service_account_path.write_text(service_account_content, encoding='utf-8')
     else:
         pytest.skip(
             'VertexAI live test requires GOOGLE_APPLICATION_CREDENTIALS or GOOGLE_SERVICE_ACCOUNT_CONTENT to be set'
@@ -71,7 +71,7 @@ def anthropic(http_client: httpx.AsyncClient, _tmp_path: Path) -> Model:
     from pydantic_ai.models.anthropic import AnthropicModel
     from pydantic_ai.providers.anthropic import AnthropicProvider
 
-    return AnthropicModel('claude-3-5-sonnet-latest', provider=AnthropicProvider(http_client=http_client))
+    return AnthropicModel('claude-sonnet-4-5', provider=AnthropicProvider(http_client=http_client))
 
 
 def ollama(http_client: httpx.AsyncClient, _tmp_path: Path) -> Model:

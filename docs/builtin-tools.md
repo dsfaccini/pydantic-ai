@@ -9,8 +9,9 @@ Pydantic AI supports the following built-in tools:
 - **[`WebSearchTool`][pydantic_ai.builtin_tools.WebSearchTool]**: Allows agents to search the web
 - **[`CodeExecutionTool`][pydantic_ai.builtin_tools.CodeExecutionTool]**: Enables agents to execute code in a secure environment
 - **[`ImageGenerationTool`][pydantic_ai.builtin_tools.ImageGenerationTool]**: Enables agents to generate images
-- **[`UrlContextTool`][pydantic_ai.builtin_tools.UrlContextTool]**: Enables agents to pull URL contents into their context
+- **[`WebFetchTool`][pydantic_ai.builtin_tools.WebFetchTool]**: Enables agents to fetch web pages
 - **[`MemoryTool`][pydantic_ai.builtin_tools.MemoryTool]**: Enables agents to use memory
+- **[`MCPServerTool`][pydantic_ai.builtin_tools.MCPServerTool]**: Enables agents to use remote MCP servers with communication handled by the model provider
 
 These tools are passed to the agent via the `builtin_tools` parameter and are executed by the model provider's infrastructure.
 
@@ -30,13 +31,14 @@ making it ideal for queries that require up-to-date data.
 |----------|-----------|-------|
 | OpenAI Responses | ✅ | Full feature support. To include search results on the [`BuiltinToolReturnPart`][pydantic_ai.messages.BuiltinToolReturnPart] that's available via [`ModelResponse.builtin_tool_calls`][pydantic_ai.messages.ModelResponse.builtin_tool_calls], enable the [`OpenAIResponsesModelSettings.openai_include_web_search_sources`][pydantic_ai.models.openai.OpenAIResponsesModelSettings.openai_include_web_search_sources] [model setting](agents.md#model-run-settings). |
 | Anthropic | ✅ | Full feature support |
-| Google | ✅ | No parameter support. No [`BuiltinToolCallPart`][pydantic_ai.messages.BuiltinToolCallPart] or [`BuiltinToolReturnPart`][pydantic_ai.messages.BuiltinToolReturnPart] is generated when streaming. Using built-in tools and user tools (including [output tools](output.md#tool-output)) at the same time is not supported; to use structured output, use [`PromptedOutput`](output.md#prompted-output) instead. |
+| Google | ✅ | No parameter support. No [`BuiltinToolCallPart`][pydantic_ai.messages.BuiltinToolCallPart] or [`BuiltinToolReturnPart`][pydantic_ai.messages.BuiltinToolReturnPart] is generated when streaming. Using built-in tools and function tools (including [output tools](output.md#tool-output)) at the same time is not supported; to use structured output, use [`PromptedOutput`](output.md#prompted-output) instead. |
 | Groq | ✅ | Limited parameter support. To use web search capabilities with Groq, you need to use the [compound models](https://console.groq.com/docs/compound). |
 | OpenAI Chat Completions | ❌ | Not supported |
 | Bedrock | ❌ | Not supported |
 | Mistral | ❌ | Not supported |
 | Cohere | ❌ | Not supported |
 | HuggingFace | ❌ | Not supported |
+| Outlines | ❌ | Not supported |
 
 ### Usage
 
@@ -52,12 +54,12 @@ print(result.output)
 
 _(This example is complete, it can be run "as is")_
 
-With OpenAI, you must use their responses API to access the web search tool.
+With OpenAI, you must use their Responses API to access the web search tool.
 
 ```py {title="web_search_openai.py"}
 from pydantic_ai import Agent, WebSearchTool
 
-agent = Agent('openai-responses:gpt-4.1', builtin_tools=[WebSearchTool()])
+agent = Agent('openai-responses:gpt-5', builtin_tools=[WebSearchTool()])
 
 result = agent.run_sync('Give me a sentence with the biggest news in AI this week.')
 print(result.output)
@@ -121,13 +123,14 @@ in a secure environment, making it perfect for computational tasks, data analysi
 | Provider | Supported | Notes |
 |----------|-----------|-------|
 | OpenAI | ✅ | To include code execution output on the [`BuiltinToolReturnPart`][pydantic_ai.messages.BuiltinToolReturnPart] that's available via [`ModelResponse.builtin_tool_calls`][pydantic_ai.messages.ModelResponse.builtin_tool_calls], enable the [`OpenAIResponsesModelSettings.openai_include_code_execution_outputs`][pydantic_ai.models.openai.OpenAIResponsesModelSettings.openai_include_code_execution_outputs] [model setting](agents.md#model-run-settings). If the code execution generated images, like charts, they will be available on [`ModelResponse.images`][pydantic_ai.messages.ModelResponse.images] as [`BinaryImage`][pydantic_ai.messages.BinaryImage] objects. The generated image can also be used as [image output](output.md#image-output) for the agent run. |
-| Google | ✅ | Using built-in tools and user tools (including [output tools](output.md#tool-output)) at the same time is not supported; to use structured output, use [`PromptedOutput`](output.md#prompted-output) instead. |
+| Google | ✅ | Using built-in tools and function tools (including [output tools](output.md#tool-output)) at the same time is not supported; to use structured output, use [`PromptedOutput`](output.md#prompted-output) instead. |
 | Anthropic | ✅ | |
 | Groq | ❌ | |
 | Bedrock | ❌ | |
 | Mistral | ❌ | |
 | Cohere | ❌ | |
 | HuggingFace | ❌ | |
+| Outlines | ❌ | |
 
 ### Usage
 
@@ -198,8 +201,8 @@ The [`ImageGenerationTool`][pydantic_ai.builtin_tools.ImageGenerationTool] enabl
 
 | Provider | Supported | Notes |
 |----------|-----------|-------|
-| OpenAI Responses | ✅ | Full feature support. Only supported by models newer than `gpt-4o`. Metadata about the generated image, like the [`revised_prompt`](https://platform.openai.com/docs/guides/tools-image-generation#revised-prompt) sent to the underlying image model, is available on the [`BuiltinToolReturnPart`][pydantic_ai.messages.BuiltinToolReturnPart] that's available via [`ModelResponse.builtin_tool_calls`][pydantic_ai.messages.ModelResponse.builtin_tool_calls]. |
-| Google | ✅ | No parameter support. Only supported by [image generation models](https://ai.google.dev/gemini-api/docs/image-generation) like `gemini-2.5-flash-image-preview`. These models do not support [structured output](output.md) or [function tools](tools.md). These models will always generate images, even if this built-in tool is not explicitly specified. |
+| OpenAI Responses | ✅ | Full feature support. Only supported by models newer than `gpt-5`. Metadata about the generated image, like the [`revised_prompt`](https://platform.openai.com/docs/guides/tools-image-generation#revised-prompt) sent to the underlying image model, is available on the [`BuiltinToolReturnPart`][pydantic_ai.messages.BuiltinToolReturnPart] that's available via [`ModelResponse.builtin_tool_calls`][pydantic_ai.messages.ModelResponse.builtin_tool_calls]. |
+| Google | ✅ | No parameter support. Only supported by [image generation models](https://ai.google.dev/gemini-api/docs/image-generation) like `gemini-2.5-flash-image` and `gemini-3-pro-image-preview`. These models do not support [function tools](tools.md). These models will always have the option of generating images, even if this built-in tool is not explicitly specified. |
 | Anthropic | ❌ | |
 | Groq | ❌ | |
 | Bedrock | ❌ | |
@@ -232,7 +235,7 @@ Image generation with Google [image generation models](https://ai.google.dev/gem
 ```py {title="image_generation_google.py"}
 from pydantic_ai import Agent, BinaryImage
 
-agent = Agent('google-gla:gemini-2.5-flash-image-preview')
+agent = Agent('google-gla:gemini-2.5-flash-image')
 
 result = agent.run_sync('Tell me a two-sentence story about an axolotl with an illustration.')
 print(result.output)
@@ -303,30 +306,31 @@ For more details, check the [API documentation][pydantic_ai.builtin_tools.ImageG
 | `quality` | ✅ | ❌ |
 | `size` | ✅ | ❌ |
 
-## URL Context Tool
+## Web Fetch Tool
 
-The [`UrlContextTool`][pydantic_ai.builtin_tools.UrlContextTool] enables your agent to pull URL contents into its context,
+The [`WebFetchTool`][pydantic_ai.builtin_tools.WebFetchTool] enables your agent to pull URL contents into its context,
 allowing it to pull up-to-date information from the web.
 
 ### Provider Support
 
 | Provider | Supported | Notes |
 |----------|-----------|-------|
-| Google | ✅ | No [`BuiltinToolCallPart`][pydantic_ai.messages.BuiltinToolCallPart] or [`BuiltinToolReturnPart`][pydantic_ai.messages.BuiltinToolReturnPart] is currently generated; please submit an issue if you need this. Using built-in tools and user tools (including [output tools](output.md#tool-output)) at the same time is not supported; to use structured output, use [`PromptedOutput`](output.md#prompted-output) instead. |
+| Anthropic | ✅ | Full feature support. Uses Anthropic's [Web Fetch Tool](https://docs.claude.com/en/docs/agents-and-tools/tool-use/web-fetch-tool) internally to retrieve URL contents. |
+| Google | ✅ | No parameter support. The limits are fixed at 20 URLs per request with a maximum of 34MB per URL. Using built-in tools and function tools (including [output tools](output.md#tool-output)) at the same time is not supported; to use structured output, use [`PromptedOutput`](output.md#prompted-output) instead. |
 | OpenAI | ❌ | |
-| Anthropic | ❌ | |
 | Groq | ❌ | |
 | Bedrock | ❌ | |
 | Mistral | ❌ | |
 | Cohere | ❌ | |
 | HuggingFace | ❌ | |
+| Outlines | ❌ | |
 
 ### Usage
 
-```py {title="url_context_basic.py"}
-from pydantic_ai import Agent, UrlContextTool
+```py {title="web_fetch_basic.py"}
+from pydantic_ai import Agent, WebFetchTool
 
-agent = Agent('google-gla:gemini-2.5-flash', builtin_tools=[UrlContextTool()])
+agent = Agent('google-gla:gemini-2.5-flash', builtin_tools=[WebFetchTool()])
 
 result = agent.run_sync('What is this? https://ai.pydantic.dev')
 print(result.output)
@@ -334,6 +338,49 @@ print(result.output)
 ```
 
 _(This example is complete, it can be run "as is")_
+
+### Configuration Options
+
+The `WebFetchTool` supports several configuration parameters:
+
+```py {title="web_fetch_configured.py"}
+from pydantic_ai import Agent, WebFetchTool
+
+agent = Agent(
+    'anthropic:claude-sonnet-4-0',
+    builtin_tools=[
+        WebFetchTool(
+            allowed_domains=['ai.pydantic.dev', 'docs.pydantic.dev'],
+            max_uses=10,
+            enable_citations=True,
+            max_content_tokens=50000,
+        )
+    ],
+)
+
+result = agent.run_sync(
+    'Compare the documentation at https://ai.pydantic.dev and https://docs.pydantic.dev'
+)
+print(result.output)
+"""
+Both sites provide comprehensive documentation for Pydantic projects. ai.pydantic.dev focuses on PydanticAI, a framework for building AI agents, while docs.pydantic.dev covers Pydantic, the data validation library. They share similar documentation styles and both emphasize type safety and developer experience.
+"""
+```
+
+_(This example is complete, it can be run "as is")_
+
+#### Provider Support
+
+| Parameter | Anthropic | Google |
+|-----------|-----------|--------|
+| `max_uses` | ✅ | ❌ |
+| `allowed_domains` | ✅ | ❌ |
+| `blocked_domains` | ✅ | ❌ |
+| `enable_citations` | ✅ | ❌ |
+| `max_content_tokens` | ✅ | ❌ |
+
+!!! note "Anthropic Domain Filtering"
+    With Anthropic, you can only use either `blocked_domains` or `allowed_domains`, not both.
 
 ## Memory Tool
 
@@ -418,6 +465,149 @@ print(result.output)
 ```
 
 _(This example is complete, it can be run "as is")_
+
+## MCP Server Tool
+
+The [`MCPServerTool`][pydantic_ai.builtin_tools.MCPServerTool] allows your agent to use remote MCP servers with communication handled by the model provider.
+
+This requires the MCP server to live at a public URL the provider can reach and does not support many of the advanced features of Pydantic AI's agent-side [MCP support](mcp/client.md),
+but can result in optimized context use and caching, and faster performance due to the lack of a round-trip back to Pydantic AI.
+
+### Provider Support
+
+| Provider | Supported | Notes                 |
+|----------|-----------|-----------------------|
+| OpenAI Responses | ✅ | Full feature support. [Connectors](https://platform.openai.com/docs/guides/tools-connectors-mcp#connectors) can be used by specifying a special `x-openai-connector:<connector_id>` URL.  |
+| Anthropic | ✅ | Full feature support |
+| Google  | ❌ | Not supported |
+| Groq  | ❌ | Not supported |
+| OpenAI Chat Completions | ❌ | Not supported |
+| Bedrock | ❌ | Not supported |
+| Mistral | ❌ | Not supported |
+| Cohere | ❌ | Not supported |
+| HuggingFace | ❌ | Not supported |
+
+### Usage
+
+```py {title="mcp_server_anthropic.py"}
+from pydantic_ai import Agent, MCPServerTool
+
+agent = Agent(
+    'anthropic:claude-sonnet-4-5',
+    builtin_tools=[
+        MCPServerTool(
+            id='deepwiki',
+            url='https://mcp.deepwiki.com/mcp',  # (1)
+        )
+    ]
+)
+
+result = agent.run_sync('Tell me about the pydantic/pydantic-ai repo.')
+print(result.output)
+"""
+The pydantic/pydantic-ai repo is a Python agent framework for building Generative AI applications.
+"""
+```
+
+1. The [DeepWiki MCP server](https://docs.devin.ai/work-with-devin/deepwiki-mcp) does not require authorization.
+
+_(This example is complete, it can be run "as is")_
+
+With OpenAI, you must use their Responses API to access the MCP server tool:
+
+```py {title="mcp_server_openai.py"}
+from pydantic_ai import Agent, MCPServerTool
+
+agent = Agent(
+    'openai-responses:gpt-5',
+    builtin_tools=[
+        MCPServerTool(
+            id='deepwiki',
+            url='https://mcp.deepwiki.com/mcp',  # (1)
+        )
+    ]
+)
+
+result = agent.run_sync('Tell me about the pydantic/pydantic-ai repo.')
+print(result.output)
+"""
+The pydantic/pydantic-ai repo is a Python agent framework for building Generative AI applications.
+"""
+```
+
+1. The [DeepWiki MCP server](https://docs.devin.ai/work-with-devin/deepwiki-mcp) does not require authorization.
+
+_(This example is complete, it can be run "as is")_
+
+### Configuration Options
+
+The `MCPServerTool` supports several configuration parameters for custom MCP servers:
+
+```py {title="mcp_server_configured_url.py"}
+import os
+
+from pydantic_ai import Agent, MCPServerTool
+
+agent = Agent(
+    'openai-responses:gpt-5',
+    builtin_tools=[
+        MCPServerTool(
+            id='github',
+            url='https://api.githubcopilot.com/mcp/',
+            authorization_token=os.getenv('GITHUB_ACCESS_TOKEN', 'mock-access-token'),  # (1)
+            allowed_tools=['search_repositories', 'list_commits'],
+            description='GitHub MCP server',
+            headers={'X-Custom-Header': 'custom-value'},
+        )
+    ]
+)
+
+result = agent.run_sync('Tell me about the pydantic/pydantic-ai repo.')
+print(result.output)
+"""
+The pydantic/pydantic-ai repo is a Python agent framework for building Generative AI applications.
+"""
+```
+
+1. The [GitHub MCP server](https://github.com/github/github-mcp-server) requires an authorization token.
+
+For OpenAI Responses, you can use a [connector](https://platform.openai.com/docs/guides/tools-connectors-mcp#connectors) by specifying a special `x-openai-connector:` URL:
+
+_(This example is complete, it can be run "as is")_
+
+```py {title="mcp_server_configured_connector_id.py"}
+import os
+
+from pydantic_ai import Agent, MCPServerTool
+
+agent = Agent(
+    'openai-responses:gpt-5',
+    builtin_tools=[
+        MCPServerTool(
+            id='google-calendar',
+            url='x-openai-connector:connector_googlecalendar',
+            authorization_token=os.getenv('GOOGLE_API_KEY', 'mock-api-key'), # (1)
+        )
+    ]
+)
+
+result = agent.run_sync('What do I have on my calendar today?')
+print(result.output)
+#> You're going to spend all day playing with Pydantic AI.
+```
+
+1. OpenAI's Google Calendar connector requires an [authorization token](https://platform.openai.com/docs/guides/tools-connectors-mcp#authorizing-a-connector).
+
+_(This example is complete, it can be run "as is")_
+
+#### Provider Support
+
+| Parameter             | OpenAI | Anthropic |
+|-----------------------|--------|-----------|
+| `authorization_token` | ✅ | ✅ |
+| `allowed_tools`       | ✅ | ✅ |
+| `description`         | ✅ | ❌ |
+| `headers`             | ✅ | ❌ |
 
 ## API Reference
 

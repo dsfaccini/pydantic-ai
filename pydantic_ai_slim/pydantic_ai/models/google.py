@@ -3,7 +3,7 @@ from __future__ import annotations as _annotations
 import base64
 from collections.abc import AsyncIterator, Awaitable
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from typing import Any, Literal, cast, overload
 from uuid import uuid4
@@ -13,12 +13,13 @@ from typing_extensions import assert_never
 from .. import UnexpectedModelBehavior, _utils, usage
 from .._output import OutputObjectDefinition
 from .._run_context import RunContext
-from ..builtin_tools import CodeExecutionTool, ImageGenerationTool, UrlContextTool, WebSearchTool
-from ..exceptions import UserError
+from ..builtin_tools import CodeExecutionTool, ImageGenerationTool, WebFetchTool, WebSearchTool
+from ..exceptions import ModelAPIError, ModelHTTPError, UserError
 from ..messages import (
     BinaryContent,
     BuiltinToolCallPart,
     BuiltinToolReturnPart,
+    CachePoint,
     FilePart,
     FileUrl,
     FinishReason,
@@ -37,7 +38,8 @@ from ..messages import (
     VideoUrl,
 )
 from ..profiles import ModelProfileSpec
-from ..providers import Provider
+from ..profiles.google import GoogleModelProfile
+from ..providers import Provider, infer_provider
 from ..settings import ModelSettings
 from ..tools import ToolDefinition
 from . import (
@@ -50,7 +52,7 @@ from . import (
 )
 
 try:
-    from google.genai import Client
+    from google.genai import Client, errors
     from google.genai.types import (
         BlobDict,
         CodeExecutionResult,
@@ -73,6 +75,7 @@ try:
         GroundingMetadata,
         HttpOptionsDict,
         MediaResolution,
+        Modality,
         Part,
         PartDict,
         SafetySettingDict,
@@ -82,10 +85,9 @@ try:
         ToolDict,
         ToolListUnionDict,
         UrlContextDict,
+        UrlContextMetadata,
         VideoMetadataDict,
     )
-
-    from ..providers.google import GoogleProvider
 except ImportError as _import_error:
     raise ImportError(
         'Please install `google-genai` to use the Google model, '
@@ -93,15 +95,18 @@ except ImportError as _import_error:
     ) from _import_error
 
 LatestGoogleModelNames = Literal[
+    'gemini-flash-latest',
+    'gemini-flash-lite-latest',
     'gemini-2.0-flash',
     'gemini-2.0-flash-lite',
     'gemini-2.5-flash',
     'gemini-2.5-flash-preview-09-2025',
-    'gemini-flash-latest',
+    'gemini-2.5-flash-image',
     'gemini-2.5-flash-lite',
     'gemini-2.5-flash-lite-preview-09-2025',
-    'gemini-flash-lite-latest',
     'gemini-2.5-pro',
+    'gemini-3-pro-preview',
+    'gemini-3-pro-image-preview',
 ]
 """Latest Gemini models."""
 
@@ -127,6 +132,8 @@ _FINISH_REASON_MAP: dict[GoogleFinishReason, FinishReason | None] = {
     GoogleFinishReason.MALFORMED_FUNCTION_CALL: 'error',
     GoogleFinishReason.IMAGE_SAFETY: 'content_filter',
     GoogleFinishReason.UNEXPECTED_TOOL_CALL: 'error',
+    GoogleFinishReason.IMAGE_PROHIBITED_CONTENT: 'content_filter',
+    GoogleFinishReason.NO_IMAGE: 'error',
 }
 
 
@@ -180,13 +187,12 @@ class GoogleModel(Model):
 
     _model_name: GoogleModelName = field(repr=False)
     _provider: Provider[Client] = field(repr=False)
-    _url: str | None = field(repr=False)
 
     def __init__(
         self,
         model_name: GoogleModelName,
         *,
-        provider: Literal['google-gla', 'google-vertex'] | Provider[Client] = 'google-gla',
+        provider: Literal['google-gla', 'google-vertex', 'gateway'] | Provider[Client] = 'google-gla',
         profile: ModelProfileSpec | None = None,
         settings: ModelSettings | None = None,
     ):
@@ -195,15 +201,15 @@ class GoogleModel(Model):
         Args:
             model_name: The name of the model to use.
             provider: The provider to use for authentication and API access. Can be either the string
-                'google-gla' or 'google-vertex' or an instance of `Provider[httpx.AsyncClient]`.
-                If not provided, a new provider will be created using the other parameters.
+                'google-gla' or 'google-vertex' or an instance of `Provider[google.genai.AsyncClient]`.
+                Defaults to 'google-gla'.
             profile: The model profile to use. Defaults to a profile picked by the provider based on the model name.
             settings: The model settings to use. Defaults to None.
         """
         self._model_name = model_name
 
         if isinstance(provider, str):
-            provider = GoogleProvider(vertexai=provider == 'google-vertex')
+            provider = infer_provider('gateway/google-vertex' if provider == 'gateway' else provider)
         self._provider = provider
         self.client = provider.client
 
@@ -222,6 +228,23 @@ class GoogleModel(Model):
     def system(self) -> str:
         """The model provider."""
         return self._provider.name
+
+    def prepare_request(
+        self, model_settings: ModelSettings | None, model_request_parameters: ModelRequestParameters
+    ) -> tuple[ModelSettings | None, ModelRequestParameters]:
+        supports_native_output_with_builtin_tools = GoogleModelProfile.from_profile(
+            self.profile
+        ).google_supports_native_output_with_builtin_tools
+        if model_request_parameters.builtin_tools and model_request_parameters.output_tools:
+            if model_request_parameters.output_mode == 'auto':
+                output_mode = 'native' if supports_native_output_with_builtin_tools else 'prompted'
+                model_request_parameters = replace(model_request_parameters, output_mode=output_mode)
+            else:
+                output_mode = 'NativeOutput' if supports_native_output_with_builtin_tools else 'PromptedOutput'
+                raise UserError(
+                    f'Google does not support output tools and built-in tools at the same time. Use `output_type={output_mode}(...)` instead.'
+                )
+        return super().prepare_request(model_settings, model_request_parameters)
 
     async def request(
         self,
@@ -278,7 +301,7 @@ class GoogleModel(Model):
                     thinking_config=generation_config.get('thinking_config'),
                     media_resolution=generation_config.get('media_resolution'),
                     response_mime_type=generation_config.get('response_mime_type'),
-                    response_schema=generation_config.get('response_schema'),
+                    response_json_schema=generation_config.get('response_json_schema'),
                 ),
             )
 
@@ -319,17 +342,13 @@ class GoogleModel(Model):
         ]
 
         if model_request_parameters.builtin_tools:
-            if model_request_parameters.output_tools:
-                raise UserError(
-                    'Gemini does not support output tools and built-in tools at the same time. Use `output_type=PromptedOutput(...)` instead.'
-                )
             if model_request_parameters.function_tools:
-                raise UserError('Gemini does not support user tools and built-in tools at the same time.')
+                raise UserError('Google does not support function tools and built-in tools at the same time.')
 
             for tool in model_request_parameters.builtin_tools:
                 if isinstance(tool, WebSearchTool):
                     tools.append(ToolDict(google_search=GoogleSearchDict()))
-                elif isinstance(tool, UrlContextTool):
+                elif isinstance(tool, WebFetchTool):
                     tools.append(ToolDict(url_context=UrlContextDict()))
                 elif isinstance(tool, CodeExecutionTool):
                     tools.append(ToolDict(code_execution=ToolCodeExecutionDict()))
@@ -384,7 +403,16 @@ class GoogleModel(Model):
     ) -> GenerateContentResponse | Awaitable[AsyncIterator[GenerateContentResponse]]:
         contents, config = await self._build_content_and_config(messages, model_settings, model_request_parameters)
         func = self.client.aio.models.generate_content_stream if stream else self.client.aio.models.generate_content
-        return await func(model=self._model_name, contents=contents, config=config)  # type: ignore
+        try:
+            return await func(model=self._model_name, contents=contents, config=config)  # type: ignore
+        except errors.APIError as e:
+            if (status_code := e.code) >= 400:
+                raise ModelHTTPError(
+                    status_code=status_code,
+                    model_name=self._model_name,
+                    body=cast(Any, e.details),  # pyright: ignore[reportUnknownMemberType]
+                ) from e
+            raise ModelAPIError(model_name=self._model_name, message=str(e)) from e
 
     async def _build_content_and_config(
         self,
@@ -393,15 +421,15 @@ class GoogleModel(Model):
         model_request_parameters: ModelRequestParameters,
     ) -> tuple[list[ContentUnionDict], GenerateContentConfigDict]:
         tools = self._get_tools(model_request_parameters)
-        if tools and not self.profile.supports_tools:
+        if model_request_parameters.function_tools and not self.profile.supports_tools:
             raise UserError('Tools are not supported by this model.')
 
         response_mime_type = None
         response_schema = None
         if model_request_parameters.output_mode == 'native':
-            if tools:
+            if model_request_parameters.function_tools:
                 raise UserError(
-                    'Gemini does not support `NativeOutput` and tools at the same time. Use `output_type=ToolOutput(...)` instead.'
+                    'Google does not support `NativeOutput` and function tools at the same time. Use `output_type=ToolOutput(...)` instead.'
                 )
             response_mime_type = 'application/json'
             output_object = model_request_parameters.output_object
@@ -413,7 +441,11 @@ class GoogleModel(Model):
             response_mime_type = 'application/json'
 
         tool_config = self._get_tool_config(model_request_parameters, tools)
-        system_instruction, contents = await self._map_messages(messages)
+        system_instruction, contents = await self._map_messages(messages, model_request_parameters)
+
+        modalities = [Modality.TEXT.value]
+        if self.profile.supports_image_output:
+            modalities.append(Modality.IMAGE.value)
 
         http_options: HttpOptionsDict = {
             'headers': {'Content-Type': 'application/json', 'User-Agent': get_user_agent()}
@@ -442,31 +474,35 @@ class GoogleModel(Model):
             tools=cast(ToolListUnionDict, tools),
             tool_config=tool_config,
             response_mime_type=response_mime_type,
-            response_schema=response_schema,
+            response_json_schema=response_schema,
+            response_modalities=modalities,
         )
         return contents, config
 
     def _process_response(self, response: GenerateContentResponse) -> ModelResponse:
         if not response.candidates:
             raise UnexpectedModelBehavior('Expected at least one candidate in Gemini response')  # pragma: no cover
+
         candidate = response.candidates[0]
-        if candidate.content is None or candidate.content.parts is None:
-            if candidate.finish_reason == 'SAFETY':
-                raise UnexpectedModelBehavior('Safety settings triggered', str(response))
-            else:
-                raise UnexpectedModelBehavior(
-                    'Content field missing from Gemini response', str(response)
-                )  # pragma: no cover
-        parts = candidate.content.parts or []
 
         vendor_id = response.response_id
         vendor_details: dict[str, Any] | None = None
         finish_reason: FinishReason | None = None
-        if raw_finish_reason := candidate.finish_reason:  # pragma: no branch
+        raw_finish_reason = candidate.finish_reason
+        if raw_finish_reason:  # pragma: no branch
             vendor_details = {'finish_reason': raw_finish_reason.value}
             finish_reason = _FINISH_REASON_MAP.get(raw_finish_reason)
 
-        usage = _metadata_as_usage(response)
+        if candidate.content is None or candidate.content.parts is None:
+            if finish_reason == 'content_filter' and raw_finish_reason:
+                raise UnexpectedModelBehavior(
+                    f'Content filter {raw_finish_reason.value!r} triggered', response.model_dump_json()
+                )
+            parts = []  # pragma: no cover
+        else:
+            parts = candidate.content.parts or []
+
+        usage = _metadata_as_usage(response, provider=self._provider.name, provider_url=self._provider.base_url)
         return _process_response_from_parts(
             parts,
             candidate.grounding_metadata,
@@ -476,6 +512,7 @@ class GoogleModel(Model):
             vendor_id=vendor_id,
             vendor_details=vendor_details,
             finish_reason=finish_reason,
+            url_context_metadata=candidate.url_context_metadata,
         )
 
     async def _process_streamed_response(
@@ -493,9 +530,12 @@ class GoogleModel(Model):
             _response=peekable_response,
             _timestamp=first_chunk.create_time or _utils.now_utc(),
             _provider_name=self._provider.name,
+            _provider_url=self._provider.base_url,
         )
 
-    async def _map_messages(self, messages: list[ModelMessage]) -> tuple[ContentDict | None, list[ContentUnionDict]]:
+    async def _map_messages(
+        self, messages: list[ModelMessage], model_request_parameters: ModelRequestParameters
+    ) -> tuple[ContentDict | None, list[ContentUnionDict]]:
         contents: list[ContentUnionDict] = []
         system_parts: list[PartDict] = []
 
@@ -520,13 +560,13 @@ class GoogleModel(Model):
                         )
                     elif isinstance(part, RetryPromptPart):
                         if part.tool_name is None:
-                            message_parts.append({'text': part.model_response()})  # pragma: no cover
+                            message_parts.append({'text': part.model_response()})
                         else:
                             message_parts.append(
                                 {
                                     'function_response': {
                                         'name': part.tool_name,
-                                        'response': {'call_error': part.model_response()},
+                                        'response': {'error': part.model_response()},
                                         'id': part.tool_call_id,
                                     }
                                 }
@@ -534,17 +574,23 @@ class GoogleModel(Model):
                     else:
                         assert_never(part)
 
-                # Google GenAI requires at least one part in the message.
-                if not message_parts:
-                    message_parts = [{'text': ''}]
-                contents.append({'role': 'user', 'parts': message_parts})
+                if message_parts:
+                    contents.append({'role': 'user', 'parts': message_parts})
             elif isinstance(m, ModelResponse):
-                contents.append(_content_model_response(m, self.system))
+                maybe_content = _content_model_response(m, self.system)
+                if maybe_content:
+                    contents.append(maybe_content)
             else:
                 assert_never(m)
-        if instructions := self._get_instructions(messages):
+
+        # Google GenAI requires at least one part in the message.
+        if not contents:
+            contents = [{'role': 'user', 'parts': [{'text': ''}]}]
+
+        if instructions := self._get_instructions(messages, model_request_parameters):
             system_parts.insert(0, {'text': instructions})
         system_instruction = ContentDict(role='user', parts=system_parts) if system_parts else None
+
         return system_instruction, contents
 
     async def _map_user_prompt(self, part: UserPromptPart) -> list[PartDict]:
@@ -583,6 +629,9 @@ class GoogleModel(Model):
                     else:
                         file_data_dict: FileDataDict = {'file_uri': item.url, 'mime_type': item.media_type}
                         content.append({'file_data': file_data_dict})  # pragma: lax no cover
+                elif isinstance(item, CachePoint):
+                    # Google Gemini doesn't support prompt caching via CachePoint
+                    pass
                 else:
                     assert_never(item)
         return content
@@ -605,11 +654,12 @@ class GeminiStreamedResponse(StreamedResponse):
     _response: AsyncIterator[GenerateContentResponse]
     _timestamp: datetime
     _provider_name: str
+    _provider_url: str
 
     async def _get_event_iterator(self) -> AsyncIterator[ModelResponseStreamEvent]:  # noqa: C901
         code_execution_tool_call_id: str | None = None
         async for chunk in self._response:
-            self._usage = _metadata_as_usage(chunk)
+            self._usage = _metadata_as_usage(chunk, self._provider_name, self._provider_url)
 
             if not chunk.candidates:
                 continue  # pragma: no cover
@@ -619,7 +669,8 @@ class GeminiStreamedResponse(StreamedResponse):
             if chunk.response_id:  # pragma: no branch
                 self.provider_response_id = chunk.response_id
 
-            if raw_finish_reason := candidate.finish_reason:
+            raw_finish_reason = candidate.finish_reason
+            if raw_finish_reason:
                 self.provider_details = {'finish_reason': raw_finish_reason.value}
                 self.finish_reason = _FINISH_REASON_MAP.get(raw_finish_reason)
 
@@ -636,33 +687,48 @@ class GeminiStreamedResponse(StreamedResponse):
             #         vendor_part_id=uuid4(), part=web_search_return
             #     )
 
+            # URL context metadata (for WebFetchTool) is streamed in the first chunk, before the text,
+            # so we can safely yield it here
+            web_fetch_call, web_fetch_return = _map_url_context_metadata(
+                candidate.url_context_metadata, self.provider_name
+            )
+            if web_fetch_call and web_fetch_return:
+                yield self._parts_manager.handle_part(vendor_part_id=uuid4(), part=web_fetch_call)
+                yield self._parts_manager.handle_part(vendor_part_id=uuid4(), part=web_fetch_return)
+
             if candidate.content is None or candidate.content.parts is None:
-                if candidate.finish_reason == 'STOP':  # pragma: no cover
-                    # Normal completion - skip this chunk
-                    continue
-                elif candidate.finish_reason == 'SAFETY':  # pragma: no cover
-                    raise UnexpectedModelBehavior('Safety settings triggered', str(chunk))
+                if self.finish_reason == 'content_filter' and raw_finish_reason:  # pragma: no cover
+                    raise UnexpectedModelBehavior(
+                        f'Content filter {raw_finish_reason.value!r} triggered', chunk.model_dump_json()
+                    )
                 else:  # pragma: no cover
-                    raise UnexpectedModelBehavior('Content field missing from streaming Gemini response', str(chunk))
+                    continue
 
             parts = candidate.content.parts
             if not parts:
                 continue  # pragma: no cover
 
             for part in parts:
+                provider_details: dict[str, Any] | None = None
                 if part.thought_signature:
-                    signature = base64.b64encode(part.thought_signature).decode('utf-8')
-                    yield self._parts_manager.handle_thinking_delta(
-                        vendor_part_id='thinking',
-                        signature=signature,
-                        provider_name=self.provider_name,
-                    )
+                    # Per https://ai.google.dev/gemini-api/docs/function-calling?example=meeting#thought-signatures:
+                    # - Always send the thought_signature back to the model inside its original Part.
+                    # - Don't merge a Part containing a signature with one that does not. This breaks the positional context of the thought.
+                    # - Don't combine two Parts that both contain signatures, as the signature strings cannot be merged.
+                    thought_signature = base64.b64encode(part.thought_signature).decode('utf-8')
+                    provider_details = {'thought_signature': thought_signature}
 
                 if part.text is not None:
+                    if len(part.text) == 0 and not provider_details:
+                        continue
                     if part.thought:
-                        yield self._parts_manager.handle_thinking_delta(vendor_part_id='thinking', content=part.text)
+                        yield self._parts_manager.handle_thinking_delta(
+                            vendor_part_id=None, content=part.text, provider_details=provider_details
+                        )
                     else:
-                        maybe_event = self._parts_manager.handle_text_delta(vendor_part_id='content', content=part.text)
+                        maybe_event = self._parts_manager.handle_text_delta(
+                            vendor_part_id=None, content=part.text, provider_details=provider_details
+                        )
                         if maybe_event is not None:  # pragma: no branch
                             yield maybe_event
                 elif part.function_call:
@@ -671,34 +737,36 @@ class GeminiStreamedResponse(StreamedResponse):
                         tool_name=part.function_call.name,
                         args=part.function_call.args,
                         tool_call_id=part.function_call.id,
+                        provider_details=provider_details,
                     )
                     if maybe_event is not None:  # pragma: no branch
                         yield maybe_event
                 elif part.inline_data is not None:
+                    if part.thought:  # pragma: no cover
+                        # Per https://ai.google.dev/gemini-api/docs/image-generation#thinking-process:
+                        # > The model generates up to two interim images to test composition and logic. The last image within Thinking is also the final rendered image.
+                        # We currently don't expose these image thoughts as they can't be represented with `ThinkingPart`
+                        continue
                     data = part.inline_data.data
                     mime_type = part.inline_data.mime_type
                     assert data and mime_type, 'Inline data must have data and mime type'
                     content = BinaryContent(data=data, media_type=mime_type)
                     yield self._parts_manager.handle_part(
                         vendor_part_id=uuid4(),
-                        part=FilePart(content=BinaryContent.narrow_type(content)),
+                        part=FilePart(content=BinaryContent.narrow_type(content), provider_details=provider_details),
                     )
                 elif part.executable_code is not None:
                     code_execution_tool_call_id = _utils.generate_tool_call_id()
-                    yield self._parts_manager.handle_part(
-                        vendor_part_id=uuid4(),
-                        part=_map_executable_code(
-                            part.executable_code, self.provider_name, code_execution_tool_call_id
-                        ),
-                    )
+                    part = _map_executable_code(part.executable_code, self.provider_name, code_execution_tool_call_id)
+                    part.provider_details = provider_details
+                    yield self._parts_manager.handle_part(vendor_part_id=uuid4(), part=part)
                 elif part.code_execution_result is not None:
                     assert code_execution_tool_call_id is not None
-                    yield self._parts_manager.handle_part(
-                        vendor_part_id=uuid4(),
-                        part=_map_code_execution_result(
-                            part.code_execution_result, self.provider_name, code_execution_tool_call_id
-                        ),
+                    part = _map_code_execution_result(
+                        part.code_execution_result, self.provider_name, code_execution_tool_call_id
                     )
+                    part.provider_details = provider_details
+                    yield self._parts_manager.handle_part(vendor_part_id=uuid4(), part=part)
                 else:
                     assert part.function_response is not None, f'Unexpected part: {part}'  # pragma: no cover
 
@@ -718,24 +786,40 @@ class GeminiStreamedResponse(StreamedResponse):
         return self._timestamp
 
 
-def _content_model_response(m: ModelResponse, provider_name: str) -> ContentDict:  # noqa: C901
+def _content_model_response(m: ModelResponse, provider_name: str) -> ContentDict | None:  # noqa: C901
     parts: list[PartDict] = []
-    thought_signature: bytes | None = None
+    thinking_part_signature: str | None = None
+    function_call_requires_signature: bool = True
     for item in m.parts:
         part: PartDict = {}
-        if thought_signature:
-            part['thought_signature'] = thought_signature
-            thought_signature = None
+        if (
+            item.provider_details
+            and (thought_signature := item.provider_details.get('thought_signature'))
+            and m.provider_name == provider_name
+        ):
+            part['thought_signature'] = base64.b64decode(thought_signature)
+        elif thinking_part_signature:
+            part['thought_signature'] = base64.b64decode(thinking_part_signature)
+        thinking_part_signature = None
 
         if isinstance(item, ToolCallPart):
             function_call = FunctionCallDict(name=item.tool_name, args=item.args_as_dict(), id=item.tool_call_id)
             part['function_call'] = function_call
+            if function_call_requires_signature and not part.get('thought_signature'):
+                # Per https://ai.google.dev/gemini-api/docs/gemini-3?thinking=high#migrating_from_other_models:
+                # > If you are transferring a conversation trace from another model (e.g., Gemini 2.5) or injecting
+                # > a custom function call that was not generated by Gemini 3, you will not have a valid signature.
+                # > To bypass strict validation in these specific scenarios, populate the field with this specific
+                # > dummy string: "thoughtSignature": "context_engineering_is_the_way_to_go"
+                part['thought_signature'] = b'context_engineering_is_the_way_to_go'
+            # Only the first function call requires a signature
+            function_call_requires_signature = False
         elif isinstance(item, TextPart):
             part['text'] = item.content
         elif isinstance(item, ThinkingPart):
             if item.provider_name == provider_name and item.signature:
-                # The thought signature is to be included on the _next_ part, not the thought part itself
-                thought_signature = base64.b64decode(item.signature)
+                # The thought signature is to be included on the _next_ part, not the thinking part itself
+                thinking_part_signature = item.signature
 
             if item.content:
                 part['text'] = item.content
@@ -763,6 +847,9 @@ def _content_model_response(m: ModelResponse, provider_name: str) -> ContentDict
 
         if part:
             parts.append(part)
+
+    if not parts:
+        return None
     return ContentDict(role='model', parts=parts)
 
 
@@ -775,27 +862,31 @@ def _process_response_from_parts(
     vendor_id: str | None,
     vendor_details: dict[str, Any] | None = None,
     finish_reason: FinishReason | None = None,
+    url_context_metadata: UrlContextMetadata | None = None,
 ) -> ModelResponse:
     items: list[ModelResponsePart] = []
-
-    # We don't currently turn `candidate.url_context_metadata` into BuiltinToolCallPart and BuiltinToolReturnPart for UrlContextTool.
-    # Please file an issue if you need this.
 
     web_search_call, web_search_return = _map_grounding_metadata(grounding_metadata, provider_name)
     if web_search_call and web_search_return:
         items.append(web_search_call)
         items.append(web_search_return)
 
+    web_fetch_call, web_fetch_return = _map_url_context_metadata(url_context_metadata, provider_name)
+    if web_fetch_call and web_fetch_return:
+        items.append(web_fetch_call)
+        items.append(web_fetch_return)
+
     item: ModelResponsePart | None = None
     code_execution_tool_call_id: str | None = None
     for part in parts:
+        provider_details: dict[str, Any] | None = None
         if part.thought_signature:
-            signature = base64.b64encode(part.thought_signature).decode('utf-8')
-            if not isinstance(item, ThinkingPart):
-                item = ThinkingPart(content='')
-                items.append(item)
-            item.signature = signature
-            item.provider_name = provider_name
+            # Per https://ai.google.dev/gemini-api/docs/function-calling?example=meeting#thought-signatures:
+            # - Always send the thought_signature back to the model inside its original Part.
+            # - Don't merge a Part containing a signature with one that does not. This breaks the positional context of the thought.
+            # - Don't combine two Parts that both contain signatures, as the signature strings cannot be merged.
+            thought_signature = base64.b64encode(part.thought_signature).decode('utf-8')
+            provider_details = {'thought_signature': thought_signature}
 
         if part.executable_code is not None:
             code_execution_tool_call_id = _utils.generate_tool_call_id()
@@ -804,6 +895,9 @@ def _process_response_from_parts(
             assert code_execution_tool_call_id is not None
             item = _map_code_execution_result(part.code_execution_result, provider_name, code_execution_tool_call_id)
         elif part.text is not None:
+            # Google sometimes sends empty text parts, we don't want to add them to the response
+            if len(part.text) == 0 and not provider_details:
+                continue
             if part.thought:
                 item = ThinkingPart(content=part.text)
             else:
@@ -822,6 +916,9 @@ def _process_response_from_parts(
         else:  # pragma: no cover
             raise UnexpectedModelBehavior(f'Unsupported response from Gemini: {part!r}')
 
+        if provider_details:
+            item.provider_details = {**(item.provider_details or {}), **provider_details}
+
         items.append(item)
     return ModelResponse(
         parts=items,
@@ -839,7 +936,7 @@ def _function_declaration_from_tool(tool: ToolDefinition) -> FunctionDeclaration
     f = FunctionDeclarationDict(
         name=tool.name,
         description=tool.description or '',
-        parameters=json_schema,  # type: ignore
+        parameters_json_schema=json_schema,
     )
     return f
 
@@ -850,7 +947,7 @@ def _tool_config(function_names: list[str]) -> ToolConfigDict:
     return ToolConfigDict(function_calling_config=function_calling_config)
 
 
-def _metadata_as_usage(response: GenerateContentResponse) -> usage.RequestUsage:
+def _metadata_as_usage(response: GenerateContentResponse, provider: str, provider_url: str) -> usage.RequestUsage:
     metadata = response.usage_metadata
     if metadata is None:
         return usage.RequestUsage()
@@ -864,9 +961,6 @@ def _metadata_as_usage(response: GenerateContentResponse) -> usage.RequestUsage:
     if tool_use_prompt_token_count := metadata.tool_use_prompt_token_count:
         details['tool_use_prompt_tokens'] = tool_use_prompt_token_count
 
-    input_audio_tokens = 0
-    output_audio_tokens = 0
-    cache_audio_read_tokens = 0
     for prefix, metadata_details in [
         ('prompt', metadata.prompt_tokens_details),
         ('cache', metadata.cache_tokens_details),
@@ -880,22 +974,12 @@ def _metadata_as_usage(response: GenerateContentResponse) -> usage.RequestUsage:
             if not detail.modality or not detail.token_count:
                 continue
             details[f'{detail.modality.lower()}_{prefix}_tokens'] = detail.token_count
-            if detail.modality != 'AUDIO':
-                continue
-            if metadata_details is metadata.prompt_tokens_details:
-                input_audio_tokens = detail.token_count
-            elif metadata_details is metadata.candidates_tokens_details:
-                output_audio_tokens = detail.token_count
-            elif metadata_details is metadata.cache_tokens_details:  # pragma: no branch
-                cache_audio_read_tokens = detail.token_count
 
-    return usage.RequestUsage(
-        input_tokens=metadata.prompt_token_count or 0,
-        output_tokens=(metadata.candidates_token_count or 0) + thoughts_token_count,
-        cache_read_tokens=cached_content_token_count or 0,
-        input_audio_tokens=input_audio_tokens,
-        output_audio_tokens=output_audio_tokens,
-        cache_audio_read_tokens=cache_audio_read_tokens,
+    return usage.RequestUsage.extract(
+        response.model_dump(include={'model_version', 'usage_metadata'}, by_alias=True),
+        provider=provider,
+        provider_url=provider_url,
+        provider_fallback='google',
         details=details,
     )
 
@@ -939,6 +1023,31 @@ def _map_grounding_metadata(
                 content=[chunk.web.model_dump(mode='json') for chunk in grounding_chunks if chunk.web]
                 if (grounding_chunks := grounding_metadata.grounding_chunks)
                 else None,
+            ),
+        )
+    else:
+        return None, None
+
+
+def _map_url_context_metadata(
+    url_context_metadata: UrlContextMetadata | None, provider_name: str
+) -> tuple[BuiltinToolCallPart, BuiltinToolReturnPart] | tuple[None, None]:
+    if url_context_metadata and (url_metadata := url_context_metadata.url_metadata):
+        tool_call_id = _utils.generate_tool_call_id()
+        # Extract URLs from the metadata
+        urls = [meta.retrieved_url for meta in url_metadata if meta.retrieved_url]
+        return (
+            BuiltinToolCallPart(
+                provider_name=provider_name,
+                tool_name=WebFetchTool.kind,
+                tool_call_id=tool_call_id,
+                args={'urls': urls} if urls else None,
+            ),
+            BuiltinToolReturnPart(
+                provider_name=provider_name,
+                tool_name=WebFetchTool.kind,
+                tool_call_id=tool_call_id,
+                content=[meta.model_dump(mode='json') for meta in url_metadata],
             ),
         )
     else:

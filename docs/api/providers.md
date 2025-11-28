@@ -2,6 +2,8 @@
 
 ::: pydantic_ai.providers.Provider
 
+::: pydantic_ai.providers.gateway.gateway_provider
+
 ::: pydantic_ai.providers.google
 
 ::: pydantic_ai.providers.openai
@@ -41,3 +43,7 @@
 ::: pydantic_ai.providers.ollama.OllamaProvider
 
 ::: pydantic_ai.providers.litellm.LiteLLMProvider
+
+::: pydantic_ai.providers.nebius.NebiusProvider
+
+::: pydantic_ai.providers.ovhcloud.OVHcloudProvider

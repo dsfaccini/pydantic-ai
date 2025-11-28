@@ -2,22 +2,25 @@ from __future__ import annotations as _annotations
 
 from abc import ABC
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal
+from typing import Annotated, Any, Literal, Union
 
-from typing_extensions import TypedDict
-
-if TYPE_CHECKING:
-    from .builtin_tools import AbstractBuiltinTool
+import pydantic
+from pydantic_core import core_schema
+from typing_extensions import TypedDict, deprecated
 
 __all__ = (
     'AbstractBuiltinTool',
     'WebSearchTool',
     'WebSearchUserLocation',
     'CodeExecutionTool',
+    'WebFetchTool',
     'UrlContextTool',
     'ImageGenerationTool',
     'MemoryTool',
+    'MCPServerTool',
 )
+
+_BUILTIN_TOOL_TYPES: dict[str, type[AbstractBuiltinTool]] = {}
 
 
 @dataclass(kw_only=True)
@@ -31,6 +34,34 @@ class AbstractBuiltinTool(ABC):
 
     kind: str = 'unknown_builtin_tool'
     """Built-in tool identifier, this should be available on all built-in tools as a discriminator."""
+
+    @property
+    def unique_id(self) -> str:
+        """A unique identifier for the builtin tool.
+
+        If multiple instances of the same builtin tool can be passed to the model, subclasses should override this property to allow them to be distinguished.
+        """
+        return self.kind
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
+        _BUILTIN_TOOL_TYPES[cls.kind] = cls
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, _source_type: Any, handler: pydantic.GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
+        if cls is not AbstractBuiltinTool:
+            return handler(cls)
+
+        tools = _BUILTIN_TOOL_TYPES.values()
+        if len(tools) == 1:  # pragma: no cover
+            tools_type = next(iter(tools))
+        else:
+            tools_annotated = [Annotated[tool, pydantic.Tag(tool.kind)] for tool in tools]
+            tools_type = Annotated[Union[tuple(tools_annotated)], pydantic.Discriminator(_tool_discriminator)]  # noqa: UP007
+
+        return handler(tools_type)
 
 
 @dataclass(kw_only=True)
@@ -120,6 +151,7 @@ class WebSearchUserLocation(TypedDict, total=False):
     """The timezone of the user's location."""
 
 
+@dataclass(kw_only=True)
 class CodeExecutionTool(AbstractBuiltinTool):
     """A builtin tool that allows your agent to execute code.
 
@@ -134,16 +166,77 @@ class CodeExecutionTool(AbstractBuiltinTool):
     """The kind of tool."""
 
 
-class UrlContextTool(AbstractBuiltinTool):
+@dataclass(kw_only=True)
+class WebFetchTool(AbstractBuiltinTool):
     """Allows your agent to access contents from URLs.
+
+    The parameters that PydanticAI passes depend on the model, as some parameters may not be supported by certain models.
 
     Supported by:
 
+    * Anthropic
     * Google
     """
 
-    kind: str = 'url_context'
+    max_uses: int | None = None
+    """If provided, the tool will stop fetching URLs after the given number of uses.
+
+    Supported by:
+
+    * Anthropic
+    """
+
+    allowed_domains: list[str] | None = None
+    """If provided, only these domains will be fetched.
+
+    With Anthropic, you can only use one of `blocked_domains` or `allowed_domains`, not both.
+
+    Supported by:
+
+    * Anthropic, see <https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/web-fetch-tool#domain-filtering>
+    """
+
+    blocked_domains: list[str] | None = None
+    """If provided, these domains will never be fetched.
+
+    With Anthropic, you can only use one of `blocked_domains` or `allowed_domains`, not both.
+
+    Supported by:
+
+    * Anthropic, see <https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/web-fetch-tool#domain-filtering>
+    """
+
+    enable_citations: bool = False
+    """If True, enables citations for fetched content.
+
+    Supported by:
+
+    * Anthropic
+    """
+
+    max_content_tokens: int | None = None
+    """Maximum content length in tokens for fetched content.
+
+    Supported by:
+
+    * Anthropic
+    """
+
+    kind: str = 'web_fetch'
     """The kind of tool."""
+
+
+@deprecated('Use `WebFetchTool` instead.')
+@dataclass(kw_only=True)
+class UrlContextTool(WebFetchTool):
+    """Deprecated alias for WebFetchTool. Use WebFetchTool instead.
+
+    Overrides kind to 'url_context' so old serialized payloads with {"kind": "url_context", ...}
+    can be deserialized to UrlContextTool for backward compatibility.
+    """
+
+    kind: str = 'url_context'
+    """The kind of tool (deprecated value for backward compatibility)."""
 
 
 @dataclass(kw_only=True)
@@ -227,6 +320,7 @@ class ImageGenerationTool(AbstractBuiltinTool):
     """The kind of tool."""
 
 
+@dataclass(kw_only=True)
 class MemoryTool(AbstractBuiltinTool):
     """A builtin tool that allows your agent to use memory.
 
@@ -237,3 +331,72 @@ class MemoryTool(AbstractBuiltinTool):
 
     kind: str = 'memory'
     """The kind of tool."""
+
+
+@dataclass(kw_only=True)
+class MCPServerTool(AbstractBuiltinTool):
+    """A builtin tool that allows your agent to use MCP servers.
+
+    Supported by:
+
+    * OpenAI Responses
+    * Anthropic
+    """
+
+    id: str
+    """A unique identifier for the MCP server."""
+
+    url: str
+    """The URL of the MCP server to use.
+
+    For OpenAI Responses, it is possible to use `connector_id` by providing it as `x-openai-connector:<connector_id>`.
+    """
+
+    authorization_token: str | None = None
+    """Authorization header to use when making requests to the MCP server.
+
+    Supported by:
+
+    * OpenAI Responses
+    * Anthropic
+    """
+
+    description: str | None = None
+    """A description of the MCP server.
+
+    Supported by:
+
+    * OpenAI Responses
+    """
+
+    allowed_tools: list[str] | None = None
+    """A list of tools that the MCP server can use.
+
+    Supported by:
+
+    * OpenAI Responses
+    * Anthropic
+    """
+
+    headers: dict[str, str] | None = None
+    """Optional HTTP headers to send to the MCP server.
+
+    Use for authentication or other purposes.
+
+    Supported by:
+
+    * OpenAI Responses
+    """
+
+    kind: str = 'mcp_server'
+
+    @property
+    def unique_id(self) -> str:
+        return ':'.join([self.kind, self.id])
+
+
+def _tool_discriminator(tool_data: dict[str, Any] | AbstractBuiltinTool) -> str:
+    if isinstance(tool_data, dict):
+        return tool_data.get('kind', AbstractBuiltinTool.kind)
+    else:
+        return tool_data.kind

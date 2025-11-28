@@ -5,7 +5,7 @@ to use their tools.
 
 ## Install
 
-You need to either install [`pydantic-ai`](../install.md), or[`pydantic-ai-slim`](../install.md#slim-install) with the `mcp` optional group:
+You need to either install [`pydantic-ai`](../install.md), or [`pydantic-ai-slim`](../install.md#slim-install) with the `mcp` optional group:
 
 ```bash
 pip/uv-add "pydantic-ai-slim[mcp]"
@@ -55,18 +55,16 @@ from pydantic_ai import Agent
 from pydantic_ai.mcp import MCPServerStreamableHTTP
 
 server = MCPServerStreamableHTTP('http://localhost:8000/mcp')  # (1)!
-agent = Agent('openai:gpt-4o', toolsets=[server])  # (2)!
+agent = Agent('openai:gpt-5', toolsets=[server])  # (2)!
 
 async def main():
-    async with agent:  # (3)!
-        result = await agent.run('What is 7 plus 5?')
+    result = await agent.run('What is 7 plus 5?')
     print(result.output)
     #> The answer is 12.
 ```
 
 1. Define the MCP server with the URL used to connect.
 2. Create an agent with the MCP server attached.
-3. Create a client session to connect to the server.
 
 _(This example is complete, it can be run "as is" — you'll need to add `asyncio.run(main())` to run `main`)_
 
@@ -118,19 +116,17 @@ from pydantic_ai import Agent
 from pydantic_ai.mcp import MCPServerSSE
 
 server = MCPServerSSE('http://localhost:3001/sse')  # (1)!
-agent = Agent('openai:gpt-4o', toolsets=[server])  # (2)!
+agent = Agent('openai:gpt-5', toolsets=[server])  # (2)!
 
 
 async def main():
-    async with agent:  # (3)!
-        result = await agent.run('What is 7 plus 5?')
+    result = await agent.run('What is 7 plus 5?')
     print(result.output)
     #> The answer is 12.
 ```
 
 1. Define the MCP server with the URL used to connect.
 2. Create an agent with the MCP server attached.
-3. Create a client session to connect to the server.
 
 _(This example is complete, it can be run "as is" — you'll need to add `asyncio.run(main())` to run `main`)_
 
@@ -147,12 +143,11 @@ from pydantic_ai.mcp import MCPServerStdio
 server = MCPServerStdio(  # (1)!
     'uv', args=['run', 'mcp-run-python', 'stdio'], timeout=10
 )
-agent = Agent('openai:gpt-4o', toolsets=[server])
+agent = Agent('openai:gpt-5', toolsets=[server])
 
 
 async def main():
-    async with agent:
-        result = await agent.run('How many days between 2000-01-01 and 2025-03-18?')
+    result = await agent.run('How many days between 2000-01-01 and 2025-03-18?')
     print(result.output)
     #> There are 9,208 days between January 1, 2000, and March 18, 2025.
 ```
@@ -192,6 +187,37 @@ The configuration file should be a JSON file with an `mcpServers` object contain
 
     We made this decision given that the SSE transport is deprecated.
 
+### Environment Variables
+
+The configuration file supports environment variable expansion using the `${VAR}` and `${VAR:-default}` syntax,
+[like Claude Code](https://code.claude.com/docs/en/mcp#environment-variable-expansion-in-mcp-json).
+This is useful for keeping sensitive information like API keys or host names out of your configuration files:
+
+```json {title="mcp_config_with_env.json"}
+{
+  "mcpServers": {
+    "python-runner": {
+      "command": "${PYTHON_CMD:-python3}",
+      "args": ["run", "${MCP_MODULE}", "stdio"],
+      "env": {
+        "API_KEY": "${MY_API_KEY}"
+      }
+    },
+    "weather-api": {
+      "url": "https://${SERVER_HOST:-localhost}:${SERVER_PORT:-8080}/sse"
+    }
+  }
+}
+```
+
+When loading this configuration with [`load_mcp_servers()`][pydantic_ai.mcp.load_mcp_servers]:
+
+- `${VAR}` references will be replaced with the corresponding environment variable values.
+- `${VAR:-default}` references will use the environment variable value if set, otherwise the default value.
+
+!!! warning
+    If a referenced environment variable using `${VAR}` syntax is not defined, a `ValueError` will be raised. Use the `${VAR:-default}` syntax to provide a fallback value.
+
 ### Usage
 
 ```python {title="mcp_config_loader.py" test="skip"}
@@ -205,8 +231,7 @@ servers = load_mcp_servers('mcp_config.json')
 agent = Agent('openai:gpt-5', toolsets=servers)
 
 async def main():
-    async with agent:
-        result = await agent.run('What is 7 plus 5?')
+    result = await agent.run('What is 7 plus 5?')
     print(result.output)
 ```
 
@@ -247,8 +272,7 @@ agent = Agent(
 
 
 async def main():
-    async with agent:
-        result = await agent.run('Echo with deps set to 42', deps=42)
+    result = await agent.run('Echo with deps set to 42', deps=42)
     print(result.output)
     #> {"echo_deps":{"echo":"This is an echo message","deps":42}}
 ```
@@ -311,12 +335,96 @@ calculator_server = MCPServerSSE(
 # Both servers might have a tool named 'get_data', but they'll be exposed as:
 # - 'weather_get_data'
 # - 'calc_get_data'
-agent = Agent('openai:gpt-4o', toolsets=[weather_server, calculator_server])
+agent = Agent('openai:gpt-5', toolsets=[weather_server, calculator_server])
 ```
+
+## Server Instructions
+
+MCP servers can provide instructions during initialization that give context about how to best interact with the server's tools. These instructions are accessible via the [`instructions`][pydantic_ai.mcp.MCPServer.instructions] property after the server connection is established.
+
+```python {title="mcp_server_instructions.py"}
+from pydantic_ai import Agent
+from pydantic_ai.mcp import MCPServerStreamableHTTP
+
+server = MCPServerStreamableHTTP('http://localhost:8000/mcp')
+agent = Agent('openai:gpt-5', toolsets=[server])
+
+@agent.instructions
+async def mcp_server_instructions():
+    return server.instructions  # (1)!
+
+async def main():
+    result = await agent.run('What is 7 plus 5?')
+    print(result.output)
+    #> The answer is 12.
+```
+
+1. The server connection is guaranteed to be established by this point, so `server.instructions` is available.
 
 ## Tool metadata
 
 MCP tools can include metadata that provides additional information about the tool's characteristics, which can be useful when [filtering tools][pydantic_ai.toolsets.FilteredToolset]. The `meta`, `annotations`, and `output_schema` fields can be found on the `metadata` dict on the [`ToolDefinition`][pydantic_ai.tools.ToolDefinition] object that's passed to filter functions.
+
+## Resources
+
+MCP servers can provide [resources](https://modelcontextprotocol.io/docs/concepts/resources) - files, data, or content that can be accessed by the client. Resources in MCP are application-driven, with host applications determining how to incorporate context manually, based on their needs. This means they will _not_ be exposed to the LLM automatically (unless a tool returns a `ResourceLink` or `EmbeddedResource`).
+
+Pydantic AI provides methods to discover and read resources from MCP servers:
+
+- [`list_resources()`][pydantic_ai.mcp.MCPServer.list_resources] - List all available resources on the server
+- [`list_resource_templates()`][pydantic_ai.mcp.MCPServer.list_resource_templates] - List resource templates with parameter placeholders
+- [`read_resource(uri)`][pydantic_ai.mcp.MCPServer.read_resource] - Read the contents of a specific resource by URI
+
+Resources are automatically converted: text content is returned as `str`, and binary content is returned as [`BinaryContent`][pydantic_ai.messages.BinaryContent].
+
+Before consuming resources, we need to run a server that exposes some:
+
+```python {title="mcp_resource_server.py"}
+from mcp.server.fastmcp import FastMCP
+
+mcp = FastMCP('Pydantic AI MCP Server')
+log_level = 'unset'
+
+
+@mcp.resource('resource://user_name.txt', mime_type='text/plain')
+async def user_name_resource() -> str:
+    return 'Alice'
+
+
+if __name__ == '__main__':
+    mcp.run()
+```
+
+Then we can create the client:
+
+```python {title="mcp_resources.py", requires="mcp_resource_server.py"}
+import asyncio
+
+from pydantic_ai.mcp import MCPServerStdio
+
+
+async def main():
+    server = MCPServerStdio('python', args=['-m', 'mcp_resource_server'])
+
+    async with server:
+        # List all available resources
+        resources = await server.list_resources()
+        for resource in resources:
+            print(f' - {resource.name}: {resource.uri} ({resource.mime_type})')
+            #>  - user_name_resource: resource://user_name.txt (text/plain)
+
+        # Read a text resource
+        user_name = await server.read_resource('resource://user_name.txt')
+        print(f'Text content: {user_name}')
+        #> Text content: Alice
+
+
+if __name__ == '__main__':
+    asyncio.run(main())
+```
+
+_(This example is complete, it can be run "as is")_
+
 
 ## Custom TLS / SSL configuration
 
@@ -353,11 +461,10 @@ server = MCPServerSSE(
     'http://localhost:3001/sse',
     http_client=http_client,  # (1)!
 )
-agent = Agent('openai:gpt-4o', toolsets=[server])
+agent = Agent('openai:gpt-5', toolsets=[server])
 
 async def main():
-    async with agent:
-        result = await agent.run('How many days between 2000-01-01 and 2025-03-18?')
+    result = await agent.run('How many days between 2000-01-01 and 2025-03-18?')
     print(result.output)
     #> There are 9,208 days between January 1, 2000, and March 18, 2025.
 ```
@@ -432,9 +539,9 @@ Let's say we have an MCP server that wants to use sampling (in this case to gene
         path = Path(f'{subject}_{style}.svg')
         # remove triple backticks if the svg was returned within markdown
         if m := re.search(r'^```\w*$(.+?)```$', result.content.text, re.S | re.M):
-            path.write_text(m.group(1))
+            path.write_text(m.group(1), encoding='utf-8')
         else:
-            path.write_text(result.content.text)
+            path.write_text(result.content.text, encoding='utf-8')
         return f'See {path}'
 
 
@@ -450,13 +557,12 @@ from pydantic_ai import Agent
 from pydantic_ai.mcp import MCPServerStdio
 
 server = MCPServerStdio('python', args=['generate_svg.py'])
-agent = Agent('openai:gpt-4o', toolsets=[server])
+agent = Agent('openai:gpt-5', toolsets=[server])
 
 
 async def main():
-    async with agent:
-        agent.set_mcp_sampling_model()
-        result = await agent.run('Create an image of a robot in a punk style.')
+    agent.set_mcp_sampling_model()
+    result = await agent.run('Create an image of a robot in a punk style.')
     print(result.output)
     #> Image file written to robot_punk.svg.
 ```
@@ -593,14 +699,13 @@ restaurant_server = MCPServerStdio(
 )
 
 # Create agent
-agent = Agent('openai:gpt-4o', toolsets=[restaurant_server])
+agent = Agent('openai:gpt-5', toolsets=[restaurant_server])
 
 
 async def main():
     """Run the agent to book a restaurant table."""
-    async with agent:
-        result = await agent.run('Book me a table')
-        print(f'\nResult: {result.output}')
+    result = await agent.run('Book me a table')
+    print(f'\nResult: {result.output}')
 
 
 if __name__ == '__main__':

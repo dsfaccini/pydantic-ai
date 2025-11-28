@@ -9,7 +9,6 @@ import sys
 from collections.abc import AsyncIterator, Iterable, Sequence
 from dataclasses import dataclass, field
 from inspect import FrameInfo
-from io import StringIO
 from pathlib import Path
 from typing import Any
 
@@ -20,7 +19,6 @@ from devtools import debug
 from pytest_examples import CodeExample, EvalExample, find_examples
 from pytest_examples.config import ExamplesConfig as BaseExamplesConfig
 from pytest_mock import MockerFixture
-from rich.console import Console
 
 from pydantic_ai import (
     AbstractToolset,
@@ -117,7 +115,7 @@ def tmp_path_cwd(tmp_path: Path):
     'ignore:`BuiltinToolCallEvent` is deprecated', 'ignore:`BuiltinToolResultEvent` is deprecated'
 )
 @pytest.mark.parametrize('example', find_filter_examples())
-def test_docs_examples(  # noqa: C901
+def test_docs_examples(
     example: CodeExample,
     eval_example: EvalExample,
     mocker: MockerFixture,
@@ -144,12 +142,8 @@ def test_docs_examples(  # noqa: C901
 
     class CustomEvaluationReport(EvaluationReport):
         def print(self, *args: Any, **kwargs: Any) -> None:
-            if 'width' in kwargs:  # pragma: lax no cover
-                raise ValueError('width should not be passed to CustomEvaluationReport')
-            table = self.console_table(*args, **kwargs)
-            io_file = StringIO()
-            Console(file=io_file, width=150).print(table)
-            print(io_file.getvalue())
+            kwargs['width'] = 150
+            super().print(*args, **kwargs)
 
     mocker.patch('pydantic_evals.dataset.EvaluationReport', side_effect=CustomEvaluationReport)
 
@@ -170,6 +164,22 @@ def test_docs_examples(  # noqa: C901
     env.set('AWS_DEFAULT_REGION', 'us-east-1')
     env.set('VERCEL_AI_GATEWAY_API_KEY', 'testing')
     env.set('CEREBRAS_API_KEY', 'testing')
+    env.set('NEBIUS_API_KEY', 'testing')
+    env.set('HEROKU_INFERENCE_KEY', 'testing')
+    env.set('FIREWORKS_API_KEY', 'testing')
+    env.set('TOGETHER_API_KEY', 'testing')
+    env.set('OLLAMA_API_KEY', 'testing')
+    env.set('OLLAMA_BASE_URL', 'http://localhost:11434/v1')
+    env.set('AZURE_OPENAI_API_KEY', 'testing')
+    env.set('AZURE_OPENAI_ENDPOINT', 'https://your-azure-endpoint.openai.azure.com')
+    env.set('OPENAI_API_VERSION', '2024-05-01')
+    env.set('OPENROUTER_API_KEY', 'testing')
+    env.set('GITHUB_API_KEY', 'testing')
+    env.set('GROK_API_KEY', 'testing')
+    env.set('MOONSHOTAI_API_KEY', 'testing')
+    env.set('DEEPSEEK_API_KEY', 'testing')
+    env.set('OVHCLOUD_API_KEY', 'testing')
+    env.set('PYDANTIC_AI_GATEWAY_API_KEY', 'testing')
 
     prefix_settings = example.prefix_settings()
     opt_test = prefix_settings.get('test', '')
@@ -195,7 +205,7 @@ def test_docs_examples(  # noqa: C901
         for req in requires.split(','):
             known_local_folder.append(Path(req).stem)
             if ex := code_examples.get(req):
-                (tmp_path_cwd / req).write_text(ex.source)
+                (tmp_path_cwd / req).write_text(ex.source, encoding='utf-8')
             else:  # pragma: no cover
                 raise KeyError(f'Example {req} not found, check the `requires` header of this example.')
 
@@ -249,7 +259,9 @@ def test_docs_examples(  # noqa: C901
 def print_callback(s: str) -> str:
     s = re.sub(r'datetime\.datetime\(.+?\)', 'datetime.datetime(...)', s, flags=re.DOTALL)
     s = re.sub(r'\d\.\d{4,}e-0\d', '0.0...', s)
-    return re.sub(r'datetime.date\(', 'date(', s)
+    s = re.sub(r'datetime.date\(', 'date(', s)
+    s = re.sub(r"run_id='.+?'", "run_id='...'", s)
+    return s
 
 
 def mock_render_duration(seconds: float, force_signed: bool) -> str:
@@ -292,6 +304,10 @@ class MockMCPServer(AbstractToolset[Any]):
     def id(self) -> str | None:
         return None  # pragma: no cover
 
+    @property
+    def instructions(self) -> str | None:
+        return None
+
     async def __aenter__(self) -> MockMCPServer:
         return self
 
@@ -330,6 +346,13 @@ text_responses: dict[str, str | ToolCallPart | Sequence[ToolCallPart]] = {
     'What was his most famous equation?': "Albert Einstein's most famous equation is (E = mc^2).",
     'What is the date?': 'Hello Frank, the date today is 2032-01-02.',
     'What is this? https://ai.pydantic.dev': 'A Python agent framework for building Generative AI applications.',
+    'Compare the documentation at https://ai.pydantic.dev and https://docs.pydantic.dev': (
+        'Both sites provide comprehensive documentation for Pydantic projects. '
+        'ai.pydantic.dev focuses on PydanticAI, a framework for building AI agents, '
+        'while docs.pydantic.dev covers Pydantic, the data validation library. '
+        'They share similar documentation styles and both emphasize type safety and developer experience.'
+    ),
+    'Give me some examples of my products.': 'Here are some examples of my data: Pen, Paper, Pencil.',
     'Put my money on square eighteen': ToolCallPart(
         tool_name='roulette_wheel', args={'square': 18}, tool_call_id='pyd_ai_tool_call_id'
     ),
@@ -489,6 +512,7 @@ text_responses: dict[str, str | ToolCallPart | Sequence[ToolCallPart]] = {
     'What is a banana?': ToolCallPart(tool_name='return_fruit', args={'name': 'banana', 'color': 'yellow'}),
     'What is a Ford Explorer?': '{"result": {"kind": "Vehicle", "data": {"name": "Ford Explorer", "wheels": 4}}}',
     'What is a MacBook?': '{"result": {"kind": "Device", "data": {"name": "MacBook", "kind": "laptop"}}}',
+    'Give me a value of 5.': ToolCallPart(tool_name='final_result', args={'x': 5}),
     'Write a creative story about space exploration': 'In the year 2157, Captain Maya Chen piloted her spacecraft through the vast expanse of the Andromeda Galaxy. As she discovered a planet with crystalline mountains that sang in harmony with the cosmic winds, she realized that space exploration was not just about finding new worlds, but about finding new ways to understand the universe and our place within it.',
     'Create a person': ToolCallPart(
         tool_name='final_result',
@@ -510,6 +534,10 @@ text_responses: dict[str, str | ToolCallPart | Sequence[ToolCallPart]] = {
     ),
     'Remember that I live in Mexico City': "Got it! I've recorded that you live in Mexico City. I'll remember this for future reference.",
     'Where do I live?': 'You live in Mexico City.',
+    'Tell me about the pydantic/pydantic-ai repo.': 'The pydantic/pydantic-ai repo is a Python agent framework for building Generative AI applications.',
+    'What do I have on my calendar today?': "You're going to spend all day playing with Pydantic AI.",
+    'Write a long story about a cat': 'Once upon a time, there was a curious cat named Whiskers who loved to explore the world around him...',
+    'What is the first sentence on https://ai.pydantic.dev?': 'Pydantic AI is a Python agent framework designed to make it less painful to build production grade applications with Generative AI.',
 }
 
 tool_responses: dict[tuple[str, str], str] = {
@@ -555,7 +583,7 @@ async def model_logic(  # noqa: C901
                 ]
             )
         elif m.content.startswith('Write a list of 5 very rude things that I might say'):
-            raise UnexpectedModelBehavior('Safety settings triggered', body='<safety settings details>')
+            raise UnexpectedModelBehavior("Content filter 'SAFETY' triggered", body='<safety settings details>')
         elif m.content.startswith('<user>\n  <name>John Doe</name>'):
             return ModelResponse(
                 parts=[ToolCallPart(tool_name='final_result_EmailOk', args={}, tool_call_id='pyd_ai_tool_call_id')]
@@ -846,13 +874,37 @@ async def model_logic(  # noqa: C901
                 )
             ]
         )
-    elif isinstance(m, ToolReturnPart) and m.tool_name == 'update_file':
+    elif isinstance(m, ToolReturnPart) and m.tool_name == 'delete_file':
         return ModelResponse(
             parts=[
                 TextPart(
                     'I successfully updated `README.md` and cleared `.env`, but was not able to delete `__init__.py`.'
                 )
             ]
+        )
+    elif isinstance(m, UserPromptPart) and m.content == 'Now create a backup of README.md':
+        return ModelResponse(
+            parts=[
+                ToolCallPart(
+                    tool_name='update_file',
+                    args={'path': 'README.md.bak', 'content': 'Hello, world!'},
+                    tool_call_id='update_file_backup',
+                )
+            ],
+        )
+    elif isinstance(m, ToolReturnPart) and m.tool_name == 'update_file' and 'README.md.bak' in m.content:
+        return ModelResponse(
+            parts=[
+                TextPart(
+                    "Here's what I've done:\n"
+                    '- Attempted to delete __init__.py, but deletion is not allowed.\n'
+                    '- Updated README.md with: Hello, world!\n'
+                    '- Cleared .env (set to empty).\n'
+                    '- Created a backup at README.md.bak containing: Hello, world!\n'
+                    '\n'
+                    'If you want a different backup name or format (e.g., timestamped like README_2025-11-24.bak), let me know.'
+                )
+            ],
         )
     elif isinstance(m, ToolReturnPart) and m.tool_name == 'calculate_answer':
         return ModelResponse(
@@ -863,7 +915,7 @@ async def model_logic(  # noqa: C901
         raise RuntimeError(f'Unexpected message: {m}')
 
 
-async def stream_model_logic(  # noqa C901
+async def stream_model_logic(  # noqa: C901
     messages: list[ModelMessage], info: AgentInfo
 ) -> AsyncIterator[str | DeltaToolCalls]:  # pragma: lax no cover
     async def stream_text_response(r: str) -> AsyncIterator[str]:
