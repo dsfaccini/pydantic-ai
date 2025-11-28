@@ -51,7 +51,7 @@ from ..profiles import ModelProfile, ModelProfileSpec
 from ..profiles.openai import OpenAIModelProfile, OpenAISystemPromptRole
 from ..providers import Provider, infer_provider
 from ..settings import ModelSettings
-from ..tools import LarkTextFormat, RegexTextFormat, ToolDefinition
+from ..tools import FreeformText, LarkGrammar, RegexGrammar, ToolDefinition
 from . import Model, ModelRequestParameters, StreamedResponse, check_allow_model_requests, download_item, get_user_agent
 
 try:
@@ -1366,9 +1366,6 @@ class OpenAIResponsesModel(Model):
         try:
             extra_headers = model_settings.get('extra_headers', {})
             extra_headers.setdefault('User-Agent', get_user_agent())
-            parallel_tool_calls = self._get_parallel_tool_calling(
-                model_settings=model_settings, model_request_parameters=model_request_parameters
-            )
             return await self.client.responses.create(
                 input=openai_messages,
                 model=self.model_name,
@@ -1510,11 +1507,11 @@ class OpenAIResponsesModel(Model):
 
             # Handle different text format types
             format: CustomToolInputFormat | None = None
-            if f.text_format == 'plain':
+            if isinstance(f.text_format, FreeformText):
                 format = {'type': 'text'}
-            elif isinstance(f.text_format, RegexTextFormat):
+            elif isinstance(f.text_format, RegexGrammar):
                 format = {'type': 'grammar', 'syntax': 'regex', 'definition': f.text_format.pattern}
-            elif isinstance(f.text_format, LarkTextFormat):
+            elif isinstance(f.text_format, LarkGrammar):
                 format = {'type': 'grammar', 'syntax': 'lark', 'definition': f.text_format.definition}
 
             # If format was set (known type), return the custom tool param
@@ -2136,9 +2133,9 @@ class OpenAIResponsesStreamedResponse(StreamedResponse):
                     args_json = call_part.args_as_json_str()
                     # Drop the final `{}}` so that we can add tool args deltas
                     args_json_delta = args_json[:-3]
-                    assert args_json_delta.endswith('"tool_args":'), (
-                        f'Expected {args_json_delta!r} to end in `"tool_args":"`'
-                    )
+                    assert args_json_delta.endswith(
+                        '"tool_args":'
+                    ), f'Expected {args_json_delta!r} to end in `"tool_args":"`'
 
                     yield self._parts_manager.handle_part(
                         vendor_part_id=f'{chunk.item.id}-call', part=replace(call_part, args=None)
@@ -2423,6 +2420,15 @@ def _map_provider_details(
         provider_details['finish_reason'] = raw_finish_reason
 
     return provider_details
+
+
+def _combine_tool_call_ids(call_id: str, id: str | None) -> str:
+    """Combine call_id and id into a single string for tool call tracking.
+
+    When reasoning, the Responses API requires the `ResponseFunctionToolCall` to be returned with both the `call_id` and `id` fields.
+    Our `ToolCallPart` has only the `tool_call_id` field, so we combine the two fields into a single string.
+    """
+    return f'{call_id}|{id}' if id else call_id
 
 
 def _split_combined_tool_call_id(combined_id: str) -> tuple[str, str | None]:

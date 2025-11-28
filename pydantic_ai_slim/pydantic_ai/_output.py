@@ -549,14 +549,18 @@ class ObjectOutputProcessor(BaseObjectOutputProcessor[OutputDataT]):
         name: str | None = None,
         description: str | None = None,
         strict: bool | None = None,
-        text_format: Literal['plain'] | TextFormat | None = None,
     ):
+        text_format: TextFormat | None = None
+
         if inspect.isfunction(output) or inspect.ismethod(output):
             self._function_schema = _function_schema.function_schema(output, GenerateToolJsonSchema)
             self.validator = self._function_schema.validator
             json_schema = self._function_schema.json_schema
             json_schema['description'] = self._function_schema.description
+            text_format = self._function_schema.text_format
         else:
+            # Extract text_format from Annotated type if present
+            text_format = _function_schema._extract_text_format(output)
             json_schema_type_adapter: TypeAdapter[Any]
             validation_type_adapter: TypeAdapter[Any]
             if _utils.is_model_like(output):
@@ -901,13 +905,11 @@ class OutputToolset(AbstractToolset[AgentDepsT]):
             name = None
             description = None
             strict = None
-            text_format = None
             if isinstance(output, ToolOutput):
                 # do we need to error on conflicts here? (DavidM): If this is internal maybe doesn't matter, if public, use overloads
                 name = output.name
                 description = output.description
                 strict = output.strict
-                text_format = output.text_format
 
                 output = output.output
 
@@ -915,9 +917,7 @@ class OutputToolset(AbstractToolset[AgentDepsT]):
             if strict is None:
                 strict = default_strict
 
-            processor = ObjectOutputProcessor(
-                output=output, description=description, strict=strict, text_format=text_format
-            )
+            processor = ObjectOutputProcessor(output=output, description=description, strict=strict)
             object_def = processor.object_def
 
             if name is None:

@@ -38,7 +38,7 @@ from pydantic_ai import (
 )
 from pydantic_ai.agent import Agent
 from pydantic_ai.builtin_tools import CodeExecutionTool, MCPServerTool, WebSearchTool
-from pydantic_ai.exceptions import ModelHTTPError, ModelRetry
+from pydantic_ai.exceptions import ModelHTTPError, ModelRetry, UserError
 from pydantic_ai.messages import (
     BuiltinToolCallEvent,  # pyright: ignore[reportDeprecated]
     BuiltinToolResultEvent,  # pyright: ignore[reportDeprecated]
@@ -46,7 +46,7 @@ from pydantic_ai.messages import (
 from pydantic_ai.models import ModelRequestParameters
 from pydantic_ai.output import NativeOutput, PromptedOutput, TextOutput, ToolOutput
 from pydantic_ai.profiles.openai import openai_model_profile
-from pydantic_ai.tools import ToolDefinition
+from pydantic_ai.tools import FreeformText, ToolDefinition
 from pydantic_ai.usage import RequestUsage, RunUsage
 
 from ..conftest import IsBytes, IsDatetime, IsStr, TestEnv, try_import
@@ -2060,7 +2060,7 @@ def test_openai_responses_model_parallel_tool_calling_disabled_with_freeform():
             'properties': {'content': {'type': 'string'}},
             'required': ['content'],
         },
-        text_format='plain',
+        text_format=FreeformText(),
     )
 
     model = OpenAIResponsesModel('gpt-5', provider=OpenAIProvider(api_key='foobar'))
@@ -2079,7 +2079,7 @@ def test_openai_responses_model_parallel_tool_calling_disabled_with_freeform_out
             'properties': {'content': {'type': 'string'}},
             'required': ['content'],
         },
-        text_format='plain',
+        text_format=FreeformText(),
     )
 
     model = OpenAIResponsesModel('gpt-5', provider=OpenAIProvider(api_key='foobar'))
@@ -2098,7 +2098,7 @@ def test_openai_responses_model_freeform_function_unsupported_model_error():
             'properties': {'content': {'type': 'string'}},
             'required': ['content'],
         },
-        text_format='plain',
+        text_format=FreeformText(),
     )
 
     # GPT-4 doesn't support freeform function calling
@@ -2122,7 +2122,7 @@ def test_openai_responses_model_freeform_function_invalid_signature_error():
             },
             'required': ['param1', 'param2'],
         },
-        text_format='plain',
+        text_format=FreeformText(),
     )
 
     model = OpenAIResponsesModel('gpt-5', provider=OpenAIProvider(api_key='foobar'))
@@ -2156,7 +2156,7 @@ async def test_openai_responses_model_custom_tool_call_response_processing(allow
             'properties': {'content': {'type': 'string'}},
             'required': ['content'],
         },
-        text_format='plain',
+        text_format=FreeformText(),
     )
 
     params = ModelRequestParameters(function_tools=[freeform_tool])

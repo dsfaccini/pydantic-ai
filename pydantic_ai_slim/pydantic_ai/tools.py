@@ -35,8 +35,9 @@ __all__ = (
     'ToolApproved',
     'ToolDenied',
     'TextFormat',
-    'RegexTextFormat',
-    'LarkTextFormat',
+    'FreeformText',
+    'RegexGrammar',
+    'LarkGrammar',
 )
 
 
@@ -224,22 +225,50 @@ A = TypeVar('A')
 
 
 @dataclass
-class RegexTextFormat:
-    """Text format using regular expression pattern matching.
+class FreeformText:
+    """Marker for freeform text input without grammar constraints.
 
-    The function must take a single string argument that will be validated
-    against the provided regex pattern by the model.
+    Use this annotation to indicate a tool parameter should receive raw text
+    input via freeform function calling, without any grammar constraints.
 
     Calling a function in this way prevents parallel tool calling.
 
     Example:
         ```python
-        from pydantic_ai import Agent, RegexTextFormat
+        from typing import Annotated
+
+        from pydantic_ai import Agent, FreeformText
 
         agent = Agent('openai:gpt-5')
 
-        @agent.tool_plain(text_format=RegexTextFormat(r'\\d{3}-\\d{4}'))
-        def parse_phone(phone: str) -> str:
+        @agent.tool_plain
+        def run_code(code: Annotated[str, FreeformText()]) -> str:
+            return f'Executed: {code}'
+        ```
+
+    Note: this is currently only supported by OpenAI GPT-5 models.
+    """
+
+
+@dataclass
+class RegexGrammar:
+    r"""Grammar constraint using regular expression pattern matching.
+
+    Use this annotation to constrain tool input to match a regex pattern
+    via freeform function calling.
+
+    Calling a function in this way prevents parallel tool calling.
+
+    Example:
+        ```python
+        from typing import Annotated
+
+        from pydantic_ai import Agent, RegexGrammar
+
+        agent = Agent('openai:gpt-5')
+
+        @agent.tool_plain
+        def parse_phone(phone: Annotated[str, RegexGrammar(r'\\d{3}-\\d{4}')]) -> str:
             return f'Parsed phone: {phone}'
         ```
 
@@ -257,11 +286,11 @@ class RegexTextFormat:
 
 
 @dataclass
-class LarkTextFormat:
-    """Text format using Lark parser grammar.
+class LarkGrammar:
+    """Grammar constraint using Lark parser grammar.
 
-    The function must take a single string argument that will be validated
-    against the provided Lark grammar by the model.
+    Use this annotation to constrain tool input to match a Lark grammar
+    via freeform function calling.
 
     Requires the `lark` package to be installed for validation during tool definition.
 
@@ -269,7 +298,9 @@ class LarkTextFormat:
 
     Example:
         ```python
-        from pydantic_ai import Agent, LarkTextFormat
+        from typing import Annotated
+
+        from pydantic_ai import Agent, LarkGrammar
 
         agent = Agent('openai:gpt-5')
 
@@ -278,8 +309,8 @@ class LarkTextFormat:
         name: /[A-Za-z]+/
         '''
 
-        @agent.tool_plain(text_format=LarkTextFormat(grammar))
-        def greet(text: str) -> str:
+        @agent.tool_plain
+        def greet(text: Annotated[str, LarkGrammar(grammar)]) -> str:
             return f'Greeting: {text}'
         ```
 
@@ -305,14 +336,19 @@ class LarkTextFormat:
             )  # pragma: no cover
 
 
-TextFormat: TypeAlias = RegexTextFormat | LarkTextFormat
+TextFormat: TypeAlias = FreeformText | RegexGrammar | LarkGrammar
 """Union of all supported text format types for freeform function calling.
 
-Text formats allow constraining the plain text passed to tools instead of using JSON.
-The function must take a single string argument and prevents parallel tool calling.
+These types are used as annotations on string parameters to enable freeform function calling:
+
+- [`FreeformText`][pydantic_ai.tools.FreeformText]: Unconstrained text input
+- [`RegexGrammar`][pydantic_ai.tools.RegexGrammar]: Text constrained by a regex pattern
+- [`LarkGrammar`][pydantic_ai.tools.LarkGrammar]: Text constrained by a Lark grammar
+
+When a tool parameter is annotated with one of these types, the tool will use freeform
+function calling instead of JSON-based function calling. This prevents parallel tool calling.
 
 Note: Support varies by model. Currently only OpenAI GPT-5 models support this feature.
-Unsupported formats will be silently ignored by models that don't support them.
 """
 
 
@@ -357,7 +393,6 @@ class Tool(Generic[ToolAgentDepsT]):
     docstring_format: DocstringFormat
     require_parameter_descriptions: bool
     strict: bool | None
-    text_format: Literal['plain'] | TextFormat | None
     sequential: bool
     requires_approval: bool
     metadata: dict[str, Any] | None
@@ -381,7 +416,6 @@ class Tool(Generic[ToolAgentDepsT]):
         require_parameter_descriptions: bool = False,
         schema_generator: type[GenerateJsonSchema] = GenerateToolJsonSchema,
         strict: bool | None = None,
-        text_format: Literal['plain'] | TextFormat | None = None,
         sequential: bool = False,
         requires_approval: bool = False,
         metadata: dict[str, Any] | None = None,
@@ -437,8 +471,6 @@ class Tool(Generic[ToolAgentDepsT]):
             schema_generator: The JSON schema generator class to use. Defaults to `GenerateToolJsonSchema`.
             strict: Whether to enforce JSON schema compliance (only affects OpenAI).
                 See [`ToolDefinition`][pydantic_ai.tools.ToolDefinition] for more info.
-            text_format: Used to invoke the function using freeform function calling (only affects OpenAI).
-                See [`ToolDefinition`][pydantic_ai.tools.ToolDefinition] for more info.
             sequential: Whether the function requires a sequential/serial execution environment. Defaults to False.
             requires_approval: Whether this tool requires human-in-the-loop approval. Defaults to False.
                 See the [tools documentation](../deferred-tools.md#human-in-the-loop-tool-approval) for more info.
@@ -461,7 +493,6 @@ class Tool(Generic[ToolAgentDepsT]):
         self.docstring_format = docstring_format
         self.require_parameter_descriptions = require_parameter_descriptions
         self.strict = strict
-        self.text_format = text_format
         self.sequential = sequential
         self.requires_approval = requires_approval
         self.metadata = metadata
@@ -518,7 +549,7 @@ class Tool(Generic[ToolAgentDepsT]):
             description=self.description,
             parameters_json_schema=self.function_schema.json_schema,
             strict=self.strict,
-            text_format=self.text_format,
+            text_format=self.function_schema.text_format,
             sequential=self.sequential,
             metadata=self.metadata,
             kind='unapproved' if self.requires_approval else 'function',
@@ -587,12 +618,12 @@ class ToolDefinition:
     Note: this is currently supported by OpenAI and Anthropic models.
     """
 
-    text_format: Literal['plain'] | TextFormat | None = None
-    """Whether to invoke the function with freeform function calling for tool calls.
+    text_format: TextFormat | None = None
+    """Text format annotation for freeform function calling.
 
-    Setting this to a format while using a supported model prevents parallel tool calling
-    in exchange for passing raw text payloads to your custom tool without wrapping the data in JSON.
-    The function must take a single string argument.
+    When set, the tool will use freeform function calling instead of JSON-based function calling.
+    This prevents parallel tool calling but allows passing raw text payloads to your custom tool
+    without wrapping the data in JSON. The function must take a single string argument.
 
     When `None` (the default), the model invokes the tool in the normal way and parallel tool calls are possible.
 

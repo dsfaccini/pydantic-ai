@@ -39,8 +39,6 @@ from pydantic_ai.output import ToolOutput
 from pydantic_ai.tools import (
     DeferredToolRequests,
     DeferredToolResults,
-    LarkTextFormat,
-    RegexTextFormat,
     ToolApproved,
     ToolDefinition,
     ToolDenied,
@@ -2099,26 +2097,34 @@ def test_parallel_tool_return_with_deferred():
     )
 
 
-def test_function_text_format_regex_valid():
-    format = RegexTextFormat(pattern=r'\d+')
-    assert format.pattern == r'\d+'
+def test_regex_grammar_valid():
+    from pydantic_ai.tools import RegexGrammar
+
+    grammar = RegexGrammar(pattern=r'\d+')
+    assert grammar.pattern == r'\d+'
 
 
-def test_function_text_format_regex_invalid():
+def test_regex_grammar_invalid():
+    from pydantic_ai.tools import RegexGrammar
+
     with pytest.raises(ValueError, match='Regex pattern is invalid'):
-        RegexTextFormat(pattern='[')
+        RegexGrammar(pattern='[')
 
 
 @pytest.mark.skipif(not importlib.util.find_spec('lark'), reason='lark not installed')
-def test_function_text_format_lark_valid():
-    format = LarkTextFormat(definition='start: "hello"')
-    assert format.definition == 'start: "hello"'
+def test_lark_grammar_valid():
+    from pydantic_ai.tools import LarkGrammar
+
+    grammar = LarkGrammar(definition='start: "hello"')
+    assert grammar.definition == 'start: "hello"'
 
 
 @pytest.mark.skipif(not importlib.util.find_spec('lark'), reason='lark not installed')
-def test_function_text_format_lark_invalid():
+def test_lark_grammar_invalid():
+    from pydantic_ai.tools import LarkGrammar
+
     with pytest.raises(ValueError, match='Lark grammar is invalid'):
-        LarkTextFormat(definition='invalid grammar [')
+        LarkGrammar(definition='invalid grammar [')
 
 
 def test_tool_definition_single_string_argument():
@@ -2191,29 +2197,32 @@ def test_tool_definition_mismatched_properties_required():
     assert not tool_def.only_takes_string_argument
 
 
-def test_agent_tool_with_text_format():
+def test_agent_tool_with_freeform_text():
+    from pydantic_ai.tools import FreeformText
+
     agent = Agent(TestModel())
 
-    @agent.tool_plain(text_format='text')
-    def analyze_text(text: str) -> str:
+    @agent.tool_plain
+    def analyze_text(text: Annotated[str, FreeformText()]) -> str:
         return f'Analyzed: {text}'  # pragma: no cover
 
     tool_def = agent._function_toolset.tools['analyze_text'].tool_def
-    assert tool_def.text_format == 'text'
+    assert isinstance(tool_def.text_format, FreeformText)
     assert tool_def.only_takes_string_argument
 
 
-def test_agent_tool_with_cfg_format():
+def test_agent_tool_with_regex_grammar():
+    from pydantic_ai.tools import RegexGrammar
+
     agent = Agent(TestModel())
 
-    cfg = RegexTextFormat(pattern=r'\d+')
-
-    @agent.tool_plain(text_format=cfg)
-    def parse_numbers(numbers: str) -> str:
+    @agent.tool_plain
+    def parse_numbers(numbers: Annotated[str, RegexGrammar(r'\d+')]) -> str:
         return f'Parsed: {numbers}'  # pragma: no cover
 
     tool_def = agent._function_toolset.tools['parse_numbers'].tool_def
-    assert tool_def.text_format == cfg
+    assert isinstance(tool_def.text_format, RegexGrammar)
+    assert tool_def.text_format.pattern == r'\d+'
 
 
 def test_deferred_tool_call_approved_fails():

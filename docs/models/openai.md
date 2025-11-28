@@ -221,17 +221,19 @@ GPT‑5 can now send raw text payloads - anything from Python scripts to SQL que
 
 Note that freeform function calling does NOT support parallel tool calling.
 
-You can enable freeform function calling for a tool using the `text_format` parameter when creating your tool. To use this the tool must take a single string argument (other than the runtime context) and the model must be one of the GPT-5 responses models. For example:
+You can enable freeform function calling for a tool by annotating the string parameter with [`FreeformText`][pydantic_ai.tools.FreeformText]. The tool must take a single string argument (other than the runtime context) and the model must be one of the GPT-5 responses models. For example:
 
 ```python
-from pydantic_ai import Agent
+from typing import Annotated
+
+from pydantic_ai import Agent, FreeformText
 from pydantic_ai.models.openai import OpenAIResponsesModel
 
 model = OpenAIResponsesModel('gpt-5')  # (1)!
 agent = Agent(model)
 
-@agent.tool_plain(text_format='text')  # (2)!
-def freeform_tool(sql: str): ...
+@agent.tool_plain
+def freeform_tool(sql: Annotated[str, FreeformText()]): ...  # (2)!
 ```
 
 1. The GPT-5 family (`gpt-5`, `gpt-5-mini`, `gpt-5-nano`) all support freeform function calling.
@@ -247,20 +249,22 @@ A context‑free grammar is a collection of production rules that define which s
 
 ##### Regular Expression
 
-The grammar can be written as either a regular expression:
+The grammar can be written as either a regular expression using [`RegexGrammar`][pydantic_ai.tools.RegexGrammar]:
 
 
 ```python
-from pydantic_ai import Agent, FunctionTextFormat
+from typing import Annotated
+
+from pydantic_ai import Agent, RegexGrammar
 from pydantic_ai.models.openai import OpenAIResponsesModel
 
 model = OpenAIResponsesModel('gpt-5')  # (1)!
 agent = Agent(model)
 
-timestamp_grammar_definition = r'^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01]) (?:[01]\d|2[0-3]):[0-5]\d$'
+timestamp_pattern = r'^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01]) (?:[01]\d|2[0-3]):[0-5]\d$'
 
-@agent.tool_plain(text_format=FunctionTextFormat(syntax='regex', grammar=timestamp_grammar_definition))  # (2)!
-def timestamp_accepting_tool(timestamp: str): ...
+@agent.tool_plain
+def timestamp_accepting_tool(timestamp: Annotated[str, RegexGrammar(timestamp_pattern)]): ...  # (2)!
 ```
 
 1. The GPT-5 family (`gpt-5`, `gpt-5-mini`, `gpt-5-nano`) all support freeform function calling with context free grammar constraints. Unfortunately `gpt-5-nano` often struggles with these calls.
@@ -268,16 +272,18 @@ def timestamp_accepting_tool(timestamp: str): ...
 
 ##### LARK
 
-Or as a [LARK](https://lark-parser.readthedocs.io/en/latest/how_to_use.html) grammar:
+Or as a [LARK](https://lark-parser.readthedocs.io/en/latest/how_to_use.html) grammar using [`LarkGrammar`][pydantic_ai.tools.LarkGrammar]:
 
 ```python
-from pydantic_ai import Agent, FunctionTextFormat
+from typing import Annotated
+
+from pydantic_ai import Agent, LarkGrammar
 from pydantic_ai.models.openai import OpenAIResponsesModel
 
 model = OpenAIResponsesModel('gpt-5')  # (1)!
 agent = Agent(model)
 
-timestamp_grammar_definition = r'''
+timestamp_grammar = r'''
 start: timestamp
 
 timestamp: YEAR "-" MONTH "-" DAY " " HOUR ":" MINUTE
@@ -291,8 +297,8 @@ HOUR: /([01]\d|2[0-3])/
 MINUTE: /[0-5]\d/
 '''
 
-@agent.tool_plain(text_format=FunctionTextFormat(syntax='lark', grammar=timestamp_grammar_definition))  # (2)!
-def i_like_iso_dates(date: str): ...
+@agent.tool_plain
+def i_like_iso_dates(date: Annotated[str, LarkGrammar(timestamp_grammar)]): ...  # (2)!
 ```
 
 1. The GPT-5 family (`gpt-5`, `gpt-5-mini`, `gpt-5-nano`) all support freeform function calling with context free grammar constraints. Unfortunately `gpt-5-nano` often struggles with these calls.
@@ -300,14 +306,15 @@ def i_like_iso_dates(date: str): ...
 
 There is a limit to the grammar complexity that GPT-5 supports, as such it is important to test your grammar.
 
-Freeform function calling, with or without a context free grammar, can be used with the output tool for the agent:
+Freeform function calling, with or without a context free grammar, can be used with the output type for the agent:
 
 ```python
-from pydantic_ai import Agent, FunctionTextFormat
-from pydantic_ai.models.openai import OpenAIResponsesModel
-from pydantic_ai.output import ToolOutput
+from typing import Annotated
 
-sql_grammar_definition = r'''
+from pydantic_ai import Agent, LarkGrammar
+from pydantic_ai.models.openai import OpenAIResponsesModel
+
+sql_grammar = r'''
 start: select_stmt
 select_stmt: "SELECT" select_list "FROM" table ("WHERE" condition ("AND" condition)*)?
 select_list: "*" | column ("," column)*
@@ -320,9 +327,8 @@ condition: column ("=" | ">" | "<") (NUMBER | STRING)
 %ignore WS
 ''' # (1)!
 
-output_tool = ToolOutput(str, text_format=FunctionTextFormat(syntax='lark', grammar=sql_grammar_definition))
 model = OpenAIResponsesModel('gpt-5')
-agent = Agent(model, output_type=output_tool)
+agent = Agent(model, output_type=Annotated[str, LarkGrammar(sql_grammar)])
 ```
 
 1. An inline SQL grammar definition would be quite extensive and so this simplified version has been written, you can find an example SQL grammar [in the openai example](https://cookbook.openai.com/examples/gpt-5/gpt-5_new_params_and_tools#33-example---sql-dialect--ms-sql-vs-postgresql). There are also example grammars in the [lark repo](https://github.com/lark-parser/lark/blob/master/examples/composition/json.lark). Remember that a simpler grammar that matches your DDL will be easier for GPT-5 to work with and will result in fewer semantically invalid results.
