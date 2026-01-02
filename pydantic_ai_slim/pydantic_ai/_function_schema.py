@@ -8,7 +8,7 @@ from __future__ import annotations as _annotations
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from inspect import Parameter, signature
-from typing import TYPE_CHECKING, Any, Concatenate, cast, get_origin
+from typing import TYPE_CHECKING, Annotated, Any, Concatenate, cast, get_args, get_origin
 
 from pydantic import ConfigDict
 from pydantic._internal import _decorators, _generate_schema, _typing_extra
@@ -114,6 +114,7 @@ def function_schema(  # noqa: C901
     var_positional_field: str | None = None
     decorators = _decorators.DecoratorInfos()
     text_format: TextFormat | None = None
+    text_format_param: str | None = None
 
     description, field_descriptions = doc_descriptions(function, sig, docstring_format=docstring_format)
 
@@ -151,11 +152,12 @@ def function_schema(  # noqa: C901
                 continue
 
             # Extract text format annotation if present
-            if extracted_format := _extract_text_format(annotation):
+            if extracted_format := extract_text_format(annotation):
                 if text_format is not None:
                     errors.append('Only one parameter may have a TextFormat annotation')
                 else:
                     text_format = extracted_format
+                    text_format_param = name
 
         field_name = p.name
         if p.kind == Parameter.VAR_KEYWORD:
@@ -173,6 +175,17 @@ def function_schema(  # noqa: C901
                 field_info = FieldInfo.from_annotated_attribute(annotation, p.default)
             if field_info.description is None:
                 field_info.description = field_descriptions.get(field_name)
+
+            # Enhance description for text_format parameter with grammar constraint info
+            if field_name == text_format_param and text_format is not None:
+                grammar_desc = text_format.get_description()
+                if grammar_desc is not None:
+                    if field_info.description:
+                        # Avoid double periods when combining descriptions
+                        base_desc = field_info.description.rstrip('.')
+                        field_info.description = f'{base_desc}. {grammar_desc}'
+                    else:
+                        field_info.description = grammar_desc
 
             fields[field_name] = td_schema = gen_schema._generate_td_field_schema(  # pyright: ignore[reportPrivateUsage]
                 field_name,
@@ -314,7 +327,7 @@ def _is_call_ctx(annotation: Any) -> bool:
     return annotation is RunContext or get_origin(annotation) is RunContext
 
 
-def _extract_text_format(annotation: Any) -> TextFormat | None:
+def extract_text_format(annotation: Any) -> TextFormat | None:
     """Extract a TextFormat annotation from an Annotated type hint.
 
     Args:
@@ -323,8 +336,7 @@ def _extract_text_format(annotation: Any) -> TextFormat | None:
     Returns:
         The TextFormat instance if found, None otherwise.
     """
-    from typing import Annotated, get_args, get_origin
-
+    # Import here to avoid circular imports
     from .tools import FreeformText, LarkGrammar, RegexGrammar
 
     if get_origin(annotation) is not Annotated:

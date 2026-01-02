@@ -560,7 +560,7 @@ class ObjectOutputProcessor(BaseObjectOutputProcessor[OutputDataT]):
             text_format = self._function_schema.text_format
         else:
             # Extract text_format from Annotated type if present
-            text_format = _function_schema._extract_text_format(output)
+            text_format = _function_schema.extract_text_format(output)
             json_schema_type_adapter: TypeAdapter[Any]
             validation_type_adapter: TypeAdapter[Any]
             if _utils.is_model_like(output):

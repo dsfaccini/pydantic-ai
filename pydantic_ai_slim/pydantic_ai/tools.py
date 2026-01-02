@@ -6,7 +6,7 @@ from dataclasses import KW_ONLY, dataclass, field
 from typing import Annotated, Any, Concatenate, Generic, Literal, TypeAlias, cast
 from warnings import warn
 
-from pydantic import Discriminator, Tag
+from pydantic import Discriminator, GetCoreSchemaHandler, Tag
 from pydantic.json_schema import GenerateJsonSchema, JsonSchemaValue
 from pydantic_core import SchemaValidator, core_schema
 from typing_extensions import ParamSpec, Self, TypeVar
@@ -257,8 +257,17 @@ class FreeformText:
             return f'Executed: {code}'
         ```
 
-    Note: this is currently only supported by OpenAI GPT-5 models.
+    Note: Native freeform function calling is only supported by OpenAI GPT-5 models.
+    Other models will use JSON-based function calling with agent-side validation.
     """
+
+    def __get_pydantic_core_schema__(self, source_type: Any, handler: GetCoreSchemaHandler) -> core_schema.CoreSchema:
+        """Pass-through schema - no validation needed for freeform text."""
+        return handler(source_type)
+
+    def get_description(self) -> str | None:
+        """Return None since freeform text has no constraints to describe."""
+        return None
 
 
 @dataclass
@@ -283,7 +292,8 @@ class RegexGrammar:
             return f'Parsed phone: {phone}'
         ```
 
-    Note: this is currently only supported by OpenAI GPT-5 models.
+    Note: Native freeform function calling is only supported by OpenAI GPT-5 models.
+    Other models will use JSON-based function calling with agent-side validation.
     """
 
     pattern: str
@@ -294,6 +304,23 @@ class RegexGrammar:
             re.compile(self.pattern)
         except re.error as e:
             raise ValueError('Regex pattern is invalid') from e
+
+    def __get_pydantic_core_schema__(self, source_type: Any, handler: GetCoreSchemaHandler) -> core_schema.CoreSchema:
+        """Create a schema that validates the string matches the regex pattern."""
+        return core_schema.no_info_after_validator_function(
+            self._validate,
+            handler(source_type),
+        )
+
+    def _validate(self, value: str) -> str:
+        """Validate that the value matches the regex pattern."""
+        if not re.fullmatch(self.pattern, value):
+            raise ValueError(f'String does not match regex pattern: {self.pattern!r}')
+        return value
+
+    def get_description(self) -> str:
+        """Return a description of the regex constraint for tool descriptions."""
+        return f'Input must match regex pattern: {self.pattern}'
 
 
 @dataclass
@@ -325,7 +352,8 @@ class LarkGrammar:
             return f'Greeting: {text}'
         ```
 
-    Note: this is currently only supported by OpenAI GPT-5 models.
+    Note: Native freeform function calling is only supported by OpenAI GPT-5 models.
+    Other models will use JSON-based function calling with agent-side validation.
     """
 
     definition: str
@@ -346,20 +374,51 @@ class LarkGrammar:
                 stacklevel=2,
             )  # pragma: no cover
 
+    def __get_pydantic_core_schema__(self, source_type: Any, handler: GetCoreSchemaHandler) -> core_schema.CoreSchema:
+        """Create a schema that validates the string matches the Lark grammar."""
+        return core_schema.no_info_after_validator_function(
+            self._validate,
+            handler(source_type),
+        )
+
+    def _validate(self, value: str) -> str:
+        """Validate that the value matches the Lark grammar."""
+        try:
+            import lark
+            from lark.exceptions import LarkError
+        except ImportError:
+            # Graceful degradation if lark not installed
+            return value
+
+        try:
+            parser = lark.Lark(self.definition)
+            parser.parse(value)
+            return value
+        except LarkError as e:
+            raise ValueError(f'String does not match Lark grammar: {e}') from e
+
+    def get_description(self) -> str:
+        """Return a description of the Lark grammar constraint for tool descriptions."""
+        if len(self.definition) > 500:
+            return f'Input must match Lark grammar (truncated):\n{self.definition[:500]}...'
+        return f'Input must match Lark grammar:\n{self.definition}'
+
 
 TextFormat: TypeAlias = FreeformText | RegexGrammar | LarkGrammar
 """Union of all supported text format types for freeform function calling.
 
-These types are used as annotations on string parameters to enable freeform function calling:
+These types are used as annotations on string parameters to enable grammar-constrained tool calls:
 
 - [`FreeformText`][pydantic_ai.tools.FreeformText]: Unconstrained text input
 - [`RegexGrammar`][pydantic_ai.tools.RegexGrammar]: Text constrained by a regex pattern
 - [`LarkGrammar`][pydantic_ai.tools.LarkGrammar]: Text constrained by a Lark grammar
 
-When a tool parameter is annotated with one of these types, the tool will use freeform
-function calling instead of JSON-based function calling. This prevents parallel tool calling.
+How it works:
+- **GPT-5 models**: Uses native freeform function calling with grammar enforcement at token generation
+- **Other models**: Uses JSON-based function calling with agent-side Pydantic validation
 
-Note: Support varies by model. Currently only OpenAI GPT-5 models support this feature.
+When validation fails, the agent's retry mechanism attempts to correct the output.
+Note: GPT-5 native freeform function calling does not support parallel tool calls.
 """
 
 
