@@ -62,7 +62,7 @@ try:
         VLLMOffline,
         from_vllm_offline,
     )
-    from outlines.types.dsl import JsonSchema
+    from outlines.types.dsl import CFG, JsonSchema, Regex
     from PIL import Image as PILImage
 except ImportError as _import_error:
     raise ImportError(
@@ -296,8 +296,10 @@ class OutlinesModel(Model):
         messages: list[ModelMessage],
         model_settings: ModelSettings | None,
         model_request_parameters: ModelRequestParameters,
-    ) -> tuple[Chat, JsonSchema | None, dict[str, Any]]:
+    ) -> tuple[Chat, JsonSchema | Regex | CFG | None, dict[str, Any]]:
         """Build the generation arguments for the model."""
+        from ..tools import FreeformText, LarkGrammar, RegexGrammar
+
         if (
             model_request_parameters.function_tools
             or model_request_parameters.builtin_tools
@@ -305,10 +307,18 @@ class OutlinesModel(Model):
         ):
             raise UserError('Outlines does not support function tools and builtin tools yet.')
 
+        output_type: JsonSchema | Regex | CFG | None = None
         if model_request_parameters.output_object:
-            output_type = JsonSchema(model_request_parameters.output_object.json_schema)
-        else:
-            output_type = None
+            text_format = model_request_parameters.output_object.text_format
+            if text_format is not None:
+                if isinstance(text_format, FreeformText):
+                    output_type = None
+                elif isinstance(text_format, RegexGrammar):
+                    output_type = Regex(text_format.pattern)
+                elif isinstance(text_format, LarkGrammar):
+                    output_type = CFG(text_format.definition)
+            else:
+                output_type = JsonSchema(model_request_parameters.output_object.json_schema)
 
         prompt = await self._format_prompt(messages, model_request_parameters)
         inference_kwargs = self.format_inference_kwargs(model_settings)

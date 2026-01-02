@@ -2,7 +2,7 @@ import json
 import re
 from dataclasses import replace
 from datetime import datetime, timezone
-from typing import Any, cast
+from typing import Annotated, Any, cast
 
 import pytest
 from inline_snapshot import snapshot
@@ -38,7 +38,7 @@ from pydantic_ai import (
 )
 from pydantic_ai.agent import Agent
 from pydantic_ai.builtin_tools import CodeExecutionTool, MCPServerTool, WebSearchTool
-from pydantic_ai.exceptions import ModelHTTPError, ModelRetry, UserError
+from pydantic_ai.exceptions import ModelHTTPError, ModelRetry
 from pydantic_ai.messages import (
     BuiltinToolCallEvent,  # pyright: ignore[reportDeprecated]
     BuiltinToolResultEvent,  # pyright: ignore[reportDeprecated]
@@ -46,7 +46,7 @@ from pydantic_ai.messages import (
 from pydantic_ai.models import ModelRequestParameters
 from pydantic_ai.output import NativeOutput, PromptedOutput, TextOutput, ToolOutput
 from pydantic_ai.profiles.openai import openai_model_profile
-from pydantic_ai.tools import FreeformText, ToolDefinition
+from pydantic_ai.tools import FreeformText, LarkGrammar, RegexGrammar, ToolDefinition
 from pydantic_ai.usage import RequestUsage, RunUsage
 
 from ..conftest import IsBytes, IsDatetime, IsStr, TestEnv, try_import
@@ -2093,7 +2093,8 @@ def test_openai_responses_model_parallel_tool_calling_disabled_with_freeform_out
     assert not parallel_calling
 
 
-def test_openai_responses_model_freeform_function_unsupported_model_error():
+def test_openai_responses_model_freeform_function_unsupported_model_fallback():
+    """Test that unsupported models fall back to regular function tools with grammar constraints."""
     freeform_tool = ToolDefinition(
         name='freeform_analyzer',
         description='A freeform analyzer',
@@ -2105,16 +2106,18 @@ def test_openai_responses_model_freeform_function_unsupported_model_error():
         text_format=FreeformText(),
     )
 
-    # GPT-4 doesn't support freeform function calling
+    # GPT-4 doesn't support freeform function calling - should fall back to regular function tool
     model = OpenAIResponsesModel('gpt-4o', provider=OpenAIProvider(api_key='foobar'))
 
-    with pytest.raises(
-        UserError, match=r'uses freeform function calling but .* does not support freeform function calling'
-    ):
-        model._map_tool_definition(freeform_tool)  # type: ignore[reportPrivateUsage]
+    result = model._map_tool_definition(freeform_tool)  # pyright: ignore[reportPrivateUsage]
+
+    # Should return a regular function tool, not a custom tool
+    assert result['type'] == 'function'
+    assert result['name'] == 'freeform_analyzer'
 
 
-def test_openai_responses_model_freeform_function_invalid_signature_error():
+def test_openai_responses_model_freeform_function_multi_param_fallback():
+    """Test that tools with multiple params fall back to regular function tools."""
     multi_param_tool = ToolDefinition(
         name='multi_param_analyzer',
         description='Tool with multiple params',
@@ -2129,10 +2132,14 @@ def test_openai_responses_model_freeform_function_invalid_signature_error():
         text_format=FreeformText(),
     )
 
+    # Even GPT-5 should fall back for multi-param tools since custom tools require single string arg
     model = OpenAIResponsesModel('gpt-5', provider=OpenAIProvider(api_key='foobar'))
 
-    with pytest.raises(UserError, match=r'is set as a freeform function but does not take a single string argument'):
-        model._map_tool_definition(multi_param_tool)  # type: ignore[reportPrivateUsage]
+    result = model._map_tool_definition(multi_param_tool)  # pyright: ignore[reportPrivateUsage]
+
+    # Should return a regular function tool, not a custom tool
+    assert result['type'] == 'function'
+    assert result['name'] == 'multi_param_analyzer'
 
 
 async def test_openai_responses_model_custom_tool_call_response_processing(allow_model_requests: None):
@@ -8250,3 +8257,140 @@ async def test_openai_responses_runs_with_instructions_only(
     assert result.output
     assert isinstance(result.output, str)
     assert len(result.output) > 0
+
+
+# --- Priority 1: Core Freeform/Grammar VCR Tests ---
+
+
+@pytest.mark.vcr()
+async def test_gpt5_freeform_text_sql_tool(
+    allow_model_requests: None,
+    openai_api_key: str,
+):
+    """FreeformText tool receives raw SQL without JSON wrapping."""
+    m = OpenAIResponsesModel('gpt-5', provider=OpenAIProvider(api_key=openai_api_key))
+    agent = Agent(m)
+
+    @agent.tool_plain
+    def execute_sql(query: Annotated[str, FreeformText()]) -> str:
+        """Execute SQL query on the database."""
+        return 'Result: 3 rows returned'
+
+    result = await agent.run('Show me all users from the users table')
+
+    # Verify tool was called with SQL query
+    messages = result.all_messages()
+    tool_calls = [part for msg in messages for part in msg.parts if isinstance(part, ToolCallPart)]
+    assert len(tool_calls) >= 1
+    # The args is a dict with the parameter name as key
+    args = tool_calls[0].args
+    assert isinstance(args, dict)
+    query = args.get('query')
+    assert isinstance(query, str)
+    assert 'SELECT' in query or 'select' in query.lower()
+
+
+@pytest.mark.vcr()
+async def test_gpt5_regex_grammar_phone_tool(
+    allow_model_requests: None,
+    openai_api_key: str,
+):
+    """RegexGrammar constrains tool input to phone format."""
+    m = OpenAIResponsesModel('gpt-5', provider=OpenAIProvider(api_key=openai_api_key))
+    agent = Agent(m)
+
+    @agent.tool_plain
+    def lookup_phone(phone: Annotated[str, RegexGrammar(r'\d{3}-\d{3}-\d{4}')]) -> str:
+        """Look up a phone number in the directory."""
+        return 'Found: John Doe'
+
+    result = await agent.run('Look up the phone number 555-123-4567')
+
+    # Verify tool was called
+    messages = result.all_messages()
+    tool_calls = [part for msg in messages for part in msg.parts if isinstance(part, ToolCallPart)]
+    assert len(tool_calls) >= 1
+    # The args is a dict with the parameter name as key
+    args = tool_calls[0].args
+    assert isinstance(args, dict)
+    phone = args.get('phone')
+    assert isinstance(phone, str)
+    assert re.match(r'\d{3}-\d{3}-\d{4}', phone), f'Phone {phone!r} does not match pattern'
+
+
+@pytest.mark.vcr()
+async def test_gpt5_lark_grammar_sql_tool(
+    allow_model_requests: None,
+    openai_api_key: str,
+):
+    """LarkGrammar constrains tool input to valid SQL syntax."""
+    sql_grammar = r"""
+    start: select_stmt
+    select_stmt: "SELECT" columns "FROM" table
+    columns: "*" | WORD ("," WORD)*
+    table: WORD
+    %import common.WORD
+    %import common.WS
+    %ignore WS
+    """
+    m = OpenAIResponsesModel('gpt-5', provider=OpenAIProvider(api_key=openai_api_key))
+    agent = Agent(m)
+
+    @agent.tool_plain
+    def run_sql(query: Annotated[str, LarkGrammar(sql_grammar)]) -> str:
+        """Execute a constrained SQL SELECT query."""
+        return 'Executed successfully: 5 rows'
+
+    result = await agent.run('Get all data from the users table')
+
+    # Verify tool was called
+    messages = result.all_messages()
+    tool_calls = [part for msg in messages for part in msg.parts if isinstance(part, ToolCallPart)]
+    assert len(tool_calls) >= 1
+    # The args is a dict with the parameter name as key
+    args = tool_calls[0].args
+    assert isinstance(args, dict)
+    query = args.get('query')
+    assert isinstance(query, str)
+    assert 'SELECT' in query and 'FROM' in query, f'SQL {query!r} does not match grammar'
+
+
+@pytest.mark.vcr()
+async def test_gpt5_freeform_output_type(
+    allow_model_requests: None,
+    openai_api_key: str,
+):
+    """FreeformText output_type returns raw text without JSON."""
+    m = OpenAIResponsesModel('gpt-5', provider=OpenAIProvider(api_key=openai_api_key))
+    agent = Agent(  # pyright: ignore[reportCallIssue]
+        m,
+        output_type=Annotated[str, FreeformText()],  # pyright: ignore[reportArgumentType]
+    )
+
+    result = await agent.run('Write a haiku about coding')
+
+    # Verify output is plain text
+    assert isinstance(result.output, str)
+    assert len(result.output) > 0
+    # Should not be JSON-wrapped
+    assert not result.output.startswith('{')
+    assert not result.output.startswith('[')
+
+
+@pytest.mark.vcr()
+async def test_gpt5_regex_output_type(
+    allow_model_requests: None,
+    openai_api_key: str,
+):
+    """RegexGrammar output_type constrains final output format."""
+    m = OpenAIResponsesModel('gpt-5', provider=OpenAIProvider(api_key=openai_api_key))
+    agent = Agent(  # pyright: ignore[reportCallIssue]
+        m,
+        output_type=Annotated[str, RegexGrammar(r'[A-Z]{3}-\d{4}')],  # pyright: ignore[reportArgumentType]
+    )
+
+    result = await agent.run('Generate a product code for a laptop')
+
+    # Verify output matches the pattern ABC-1234
+    assert isinstance(result.output, str)
+    assert re.match(r'[A-Z]{3}-\d{4}', result.output), f'Output {result.output!r} does not match pattern'
