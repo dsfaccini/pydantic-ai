@@ -59,6 +59,7 @@ outlines-llamacpp = ["pydantic-ai-slim[outlines-llamacpp]=={{ version }}"]
 outlines-mlxlm = ["pydantic-ai-slim[outlines-mlxlm]=={{ version }}; platform_system == 'Darwin' and platform_machine == 'arm64'"]
 outlines-sglang = ["pydantic-ai-slim[outlines-sglang]=={{ version }}"]
 outlines-vllm-offline = ["pydantic-ai-slim[outlines-vllm-offline]=={{ version }}"]
+sentence-transformers = ["pydantic-ai-slim[sentence-transformers]=={{ version }}"]
 
 [project.urls]
 Homepage = "https://ai.pydantic.dev"
@@ -98,13 +99,13 @@ dev = [
     "dirty-equals>=0.9.0",
     "duckduckgo-search>=7.0.0",
     "inline-snapshot>=0.19.3",
-    "pytest>=8.3.3",
+    "pytest>=9.0.0",
     "pytest-examples>=0.0.18",
     "pytest-mock>=3.14.0",
     "pytest-pretty>=1.3.0",
     "pytest-recording>=0.13.2",
     "diff-cover>=9.2.0",
-    "boto3-stubs[bedrock-runtime]",
+    "boto3-stubs[bedrock-runtime]>=1.42.13",
     "strict-no-cover @ git+https://github.com/pydantic/strict-no-cover.git@7fc59da2c4dff919db2095a0f0e47101b657131d",
     "pytest-xdist>=3.6.1",
     # Needed for PyCharm users
@@ -120,8 +121,8 @@ docs = [
     "mkdocs-glightbox>=0.4.0",
     "mkdocs-llmstxt>=0.2.0",
     "mkdocs-redirects>=1.2.2",
-    "mkdocs-material[imaging]>=9.5.45",
-    "mkdocstrings-python>=1.12.2",
+    "mkdocs-material[imaging]>=9.7.0",
+    "mkdocstrings-python>=2.0.0",
     "griffe-warnings-deprecated>=1.1.0",
     "pydantic-docs",
 ]
@@ -147,7 +148,6 @@ include = [
     "clai/**/*.py",
     "tests/**/*.py",
     "docs/**/*.py",
-    "typings/**/*.pyi",
 ]
 
 [tool.ruff.lint]
@@ -195,11 +195,9 @@ quote-style = "single"
 "examples/**/*.py" = ["D101", "D103"]
 "tests/**/*.py" = ["D"]
 "docs/**/*.py" = ["D"]
-"typings/**/*.pyi" = ["F401", "PYI044", "PYI035", "ANN401"]
 
 [tool.pyright]
-stubPath = "typings"
-pythonVersion = "3.12"
+pythonVersion = "3.10"
 typeCheckingMode = "strict"
 reportMissingTypeStubs = false
 reportUnnecessaryIsInstance = false
@@ -228,7 +226,6 @@ exclude = [
 [tool.mypy]
 files = "tests/typed_agent.py,tests/typed_graph.py"
 strict = true
-mypy_path = "typings"
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "docs/.hooks"]
@@ -249,7 +246,6 @@ filterwarnings = [
     "ignore:unclosed <socket:ResourceWarning",
     "ignore:unclosed event loop:ResourceWarning",
 ]
-# addopts = ["--inline-snapshot=create,fix"]
 
 # https://coverage.readthedocs.io/en/latest/config.html#run
 [tool.coverage.run]
@@ -265,9 +261,11 @@ include = [
     "tests/**/*.py",
 ]
 omit = [
-    "tests/test_live.py",
     "tests/example_modules/*.py",
     "pydantic_ai_slim/pydantic_ai/ext/aci.py", # aci-sdk is too niche to be added as an (optional) dependency
+    # TODO(Marcelo): Enable prefect coverage again.
+    "pydantic_ai_slim/pydantic_ai/durable_exec/prefect/*.py",
+    "tests/test_prefect.py",
 ]
 branch = true
 # Disable include-ignored warnings as --source is enabled automatically causing a self conflict as per:
@@ -311,6 +309,8 @@ exclude_lines = [
     'except ImportError as _import_error:',
     '$\s*pass$',
     'assert False',
+    '@pytest\.mark\.skip',
+    '@pytest\.mark\.xfail',
 ]
 
 [tool.logfire]
