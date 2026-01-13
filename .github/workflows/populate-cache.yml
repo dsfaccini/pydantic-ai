@@ -56,7 +56,7 @@ jobs:
         if: steps.cache-exists.outputs.exists == 'false'
         run: |
           uv sync --group dev
-          UV_FROZEN= uv run --all-extras --resolution lowest-direct python -c "print('resolved')"
+          UV_FROZEN=0 uv run --all-extras --resolution lowest-direct python -c "print('resolved')"
           uv cache prune --ci
 
       - name: Upload to R2
