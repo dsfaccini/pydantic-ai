@@ -153,6 +153,7 @@ jobs:
       COVERAGE_PROCESS_START: ./pyproject.toml
       RUN_LLAMA_CPP_TESTS: false
       UV_CACHE_DIR: /tmp/uv-cache
+      UV_FROZEN: "0"
     steps:
       - uses: actions/checkout@v4
 
@@ -193,8 +194,6 @@ jobs:
           key: hf-${{ runner.os }}-${{ hashFiles('**/uv.lock') }}
           restore-keys: |
             hf-${{ runner.os }}-
-
-      - run: unset UV_FROZEN
 
       - run: uv run --all-extras --resolution lowest-direct coverage run -m pytest --durations=100 -n auto --dist=loadgroup
         env:
