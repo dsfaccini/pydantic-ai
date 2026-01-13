@@ -152,14 +152,36 @@ jobs:
       CI: true
       COVERAGE_PROCESS_START: ./pyproject.toml
       RUN_LLAMA_CPP_TESTS: false
+      UV_CACHE_DIR: /tmp/uv-cache
     steps:
       - uses: actions/checkout@v4
 
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ matrix.python-version }}
-          enable-cache: true
-          cache-suffix: lowest-versions
+          enable-cache: false
+
+      - name: Compute cache key
+        id: cache-key
+        run: |
+          DEPS_HASH=$(cat pyproject.toml pydantic_ai_slim/pyproject.toml pydantic_evals/pyproject.toml pydantic_graph/pyproject.toml | sha256sum | cut -c1-16)
+          echo "key=py${{ matrix.python-version }}-lowest-direct-${DEPS_HASH}" >> $GITHUB_OUTPUT
+
+      - name: Download cache from R2
+        continue-on-error: true
+        run: |
+          aws configure set aws_access_key_id ${{ secrets.R2_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          aws configure set default.region auto
+          R2_ENDPOINT="https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+
+          mkdir -p ${UV_CACHE_DIR}
+          if aws s3 cp "s3://${{ secrets.R2_BUCKET_NAME }}/${{ steps.cache-key.outputs.key }}.tar.zst" \
+            /tmp/cache.tar.zst --endpoint-url "${R2_ENDPOINT}"; then
+            sudo apt-get install -y zstd
+            tar -I 'zstd -d' -xf /tmp/cache.tar.zst -C ${UV_CACHE_DIR}
+            rm /tmp/cache.tar.zst
+          fi
 
       - run: mkdir .coverage
 

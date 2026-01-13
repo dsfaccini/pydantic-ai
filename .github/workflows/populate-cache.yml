@@ -1,0 +1,68 @@
+name: Populate R2 Cache
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'pyproject.toml'
+      - 'pydantic_ai_slim/pyproject.toml'
+      - 'pydantic_evals/pyproject.toml'
+      - 'pydantic_graph/pyproject.toml'
+      - 'uv.lock'
+  workflow_dispatch:
+
+env:
+  UV_CACHE_DIR: /tmp/uv-cache
+
+jobs:
+  populate-cache:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: false
+
+      - name: Compute cache key
+        id: cache-key
+        run: |
+          DEPS_HASH=$(cat pyproject.toml pydantic_ai_slim/pyproject.toml pydantic_evals/pyproject.toml pydantic_graph/pyproject.toml | sha256sum | cut -c1-16)
+          echo "key=py${{ matrix.python-version }}-lowest-direct-${DEPS_HASH}" >> $GITHUB_OUTPUT
+
+      - name: Check if cache exists
+        id: cache-exists
+        run: |
+          aws configure set aws_access_key_id ${{ secrets.R2_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          aws configure set default.region auto
+          R2_ENDPOINT="https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+
+          if aws s3 head-object --endpoint-url "${R2_ENDPOINT}" \
+            --bucket ${{ secrets.R2_BUCKET_NAME }} \
+            --key "${{ steps.cache-key.outputs.key }}.tar.zst" 2>/dev/null; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Populate cache
+        if: steps.cache-exists.outputs.exists == 'false'
+        run: |
+          uv sync --group dev
+          UV_FROZEN= uv run --all-extras --resolution lowest-direct python -c "print('resolved')"
+          uv cache prune --ci
+
+      - name: Upload to R2
+        if: steps.cache-exists.outputs.exists == 'false'
+        run: |
+          sudo apt-get install -y zstd
+          tar -I 'zstd -T0 -19' -cf /tmp/cache.tar.zst -C ${{ env.UV_CACHE_DIR }} .
+          R2_ENDPOINT="https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
+          aws s3 cp /tmp/cache.tar.zst \
+            "s3://${{ secrets.R2_BUCKET_NAME }}/${{ steps.cache-key.outputs.key }}.tar.zst" \
+            --endpoint-url "${R2_ENDPOINT}"
