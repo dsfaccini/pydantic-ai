@@ -9,9 +9,6 @@ on:
       - "pydantic_evals/pyproject.toml"
       - "pydantic_graph/pyproject.toml"
       - "uv.lock"
-  pull_request:
-    paths:
-      - ".github/workflows/populate-cache.yml"
   workflow_dispatch:
 
 env:
@@ -44,11 +41,14 @@ jobs:
           aws configure set aws_secret_access_key ${{ secrets.R2_SECRET_ACCESS_KEY }}
           aws configure set default.region auto
 
+          echo "Checking for key: ${{ steps.cache-key.outputs.key }}.tar.zst"
           if aws s3 head-object --endpoint-url "${{ secrets.R2_ENDPOINT }}" \
             --bucket ${{ secrets.R2_BUCKET_NAME }} \
-            --key "${{ steps.cache-key.outputs.key }}.tar.zst" 2>/dev/null; then
+            --key "${{ steps.cache-key.outputs.key }}.tar.zst"; then
+            echo "Cache exists!"
             echo "exists=true" >> $GITHUB_OUTPUT
           else
+            echo "Cache does not exist"
             echo "exists=false" >> $GITHUB_OUTPUT
           fi
 
