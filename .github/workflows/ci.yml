@@ -198,6 +198,7 @@ jobs:
       - run: uv run --all-extras --resolution lowest-direct coverage run -m pytest --durations=100 -n auto --dist=loadgroup
         env:
           COVERAGE_FILE: .coverage/.coverage.${{matrix.python-version}}-lowest-versions
+          UV_CACHE_DIR: /tmp/uv-cache
 
       - name: store coverage files
         uses: actions/upload-artifact@v4
