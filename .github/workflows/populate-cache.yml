@@ -9,6 +9,9 @@ on:
       - "pydantic_evals/pyproject.toml"
       - "pydantic_graph/pyproject.toml"
       - "uv.lock"
+  pull_request:
+    paths:
+      - ".github/workflows/populate-cache.yml"
   workflow_dispatch:
 
 env:
