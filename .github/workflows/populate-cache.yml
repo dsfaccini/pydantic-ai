@@ -4,11 +4,11 @@ on:
   push:
     branches: [main]
     paths:
-      - 'pyproject.toml'
-      - 'pydantic_ai_slim/pyproject.toml'
-      - 'pydantic_evals/pyproject.toml'
-      - 'pydantic_graph/pyproject.toml'
-      - 'uv.lock'
+      - "pyproject.toml"
+      - "pydantic_ai_slim/pyproject.toml"
+      - "pydantic_evals/pyproject.toml"
+      - "pydantic_graph/pyproject.toml"
+      - "uv.lock"
   workflow_dispatch:
 
 env:
@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13']
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
 
@@ -40,9 +40,8 @@ jobs:
           aws configure set aws_access_key_id ${{ secrets.R2_ACCESS_KEY_ID }}
           aws configure set aws_secret_access_key ${{ secrets.R2_SECRET_ACCESS_KEY }}
           aws configure set default.region auto
-          R2_ENDPOINT="https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
 
-          if aws s3 head-object --endpoint-url "${R2_ENDPOINT}" \
+          if aws s3 head-object --endpoint-url "${{ secrets.R2_ENDPOINT }}" \
             --bucket ${{ secrets.R2_BUCKET_NAME }} \
             --key "${{ steps.cache-key.outputs.key }}.tar.zst" 2>/dev/null; then
             echo "exists=true" >> $GITHUB_OUTPUT
@@ -62,7 +61,6 @@ jobs:
         run: |
           sudo apt-get install -y zstd
           tar -I 'zstd -T0 -19' -cf /tmp/cache.tar.zst -C ${{ env.UV_CACHE_DIR }} .
-          R2_ENDPOINT="https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com"
           aws s3 cp /tmp/cache.tar.zst \
             "s3://${{ secrets.R2_BUCKET_NAME }}/${{ steps.cache-key.outputs.key }}.tar.zst" \
-            --endpoint-url "${R2_ENDPOINT}"
+            --endpoint-url "${{ secrets.R2_ENDPOINT }}"
