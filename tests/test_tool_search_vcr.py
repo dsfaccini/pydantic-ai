@@ -33,8 +33,8 @@ MOCK_API_KEYS: dict[str, str] = {
 
 @pytest.fixture(autouse=True)
 def _mock_api_keys(monkeypatch: pytest.MonkeyPatch) -> None:
-    for key, default in MOCK_API_KEYS.items():  # pragma: no branch
-        if not os.getenv(key):
+    for key, default in MOCK_API_KEYS.items():
+        if not os.getenv(key):  # pragma: no branch
             monkeypatch.setenv(key, default)
 
 
