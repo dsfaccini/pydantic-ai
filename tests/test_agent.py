@@ -29,6 +29,7 @@ from pydantic_ai import (
     FilePart,
     FunctionToolset,
     ImageUrl,
+    IncompleteToolCall,
     ModelMessage,
     ModelMessagesTypeAdapter,
     ModelProfile,
@@ -2994,7 +2995,7 @@ def test_unknown_tool():
     agent = Agent(FunctionModel(empty))
 
     with capture_run_messages() as messages:
-        with pytest.raises(UnexpectedModelBehavior, match=r"Tool 'foobar' exceeded max retries count of 1"):
+        with pytest.raises(UnexpectedModelBehavior, match=r'Exceeded maximum retries \(1\) for output validation'):
             agent.run_sync('Hello')
     assert messages == snapshot(
         [
@@ -3090,7 +3091,7 @@ def test_unknown_tool_multiple_retries():
     agent = Agent(FunctionModel(empty), retries=num_retries)
 
     with capture_run_messages() as messages:
-        with pytest.raises(UnexpectedModelBehavior, match=r"Tool 'foobar' exceeded max retries count of 2"):
+        with pytest.raises(UnexpectedModelBehavior, match=r'Exceeded maximum retries \(2\) for output validation'):
             agent.run_sync('Hello')
     assert messages == snapshot(
         [
@@ -3148,9 +3149,19 @@ def test_unknown_tool_multiple_retries():
     )
 
 
-def test_tool_exceeds_token_limit_retries():
-    """Truncated function tool calls get retried via validation errors rather than failing immediately."""
+def test_unknown_tool_per_tool_retries_exceeded():
+    """When output_retries > retries, the per-tool retry limit fires before the agent-level one."""
 
+    def empty(_: list[ModelMessage], _info: AgentInfo) -> ModelResponse:
+        return ModelResponse(parts=[ToolCallPart('foobar', '{}')])
+
+    agent = Agent(FunctionModel(empty), retries=1, output_retries=5)
+
+    with pytest.raises(UnexpectedModelBehavior, match=r"Tool 'foobar' exceeded max retries count of 1"):
+        agent.run_sync('Hello')
+
+
+def test_tool_exceeds_token_limit_error():
     def return_incomplete_tool(_: list[ModelMessage], info: AgentInfo) -> ModelResponse:
         resp = ModelResponse(parts=[ToolCallPart('dummy_tool', args='{"foo": "bar",')])
         resp.finish_reason = 'length'
@@ -3158,13 +3169,15 @@ def test_tool_exceeds_token_limit_retries():
 
     agent = Agent(FunctionModel(return_incomplete_tool), output_type=str)
 
-    @agent.tool_plain
-    def dummy_tool(foo: str) -> str:
-        return 'tool-ok'  # pragma: no cover
+    with pytest.raises(
+        IncompleteToolCall,
+        match=r'Model token limit \(10\) exceeded while generating a tool call, resulting in incomplete arguments.',
+    ):
+        agent.run_sync('Hello', model_settings=ModelSettings(max_tokens=10))
 
     with pytest.raises(
-        UnexpectedModelBehavior,
-        match=r"Tool 'dummy_tool' exceeded max retries count of 1",
+        IncompleteToolCall,
+        match=r'Model token limit \(provider default\) exceeded while generating a tool call, resulting in incomplete arguments.',
     ):
         agent.run_sync('Hello')
 
@@ -3310,6 +3323,13 @@ class OutputType(BaseModel):
     """Result type used by multiple tests."""
 
     value: str
+
+
+class OutputTypeWithCount(BaseModel):
+    """Result type with an additional int field, used to test schema validation failures."""
+
+    value: str
+    count: int
 
 
 class TestMultipleToolCalls:
@@ -4274,7 +4294,7 @@ class TestMultipleToolCalls:
                         ),
                         ToolReturnPart(
                             tool_name='second_output',
-                            content='Output tool not used - output failed validation.',
+                            content='Output tool not used - output function execution failed.',
                             tool_call_id=IsStr(),
                             timestamp=IsNow(tz=timezone.utc),
                         ),
@@ -4456,6 +4476,112 @@ class TestMultipleToolCalls:
                 ),
             ]
         )
+
+    def test_exhaustive_strategy_second_output_schema_validation_fails(self):
+        """Test exhaustive strategy when first output succeeds and second fails schema validation."""
+        output_tools_called: list[str] = []
+
+        def process_first(output: OutputType) -> OutputType:
+            output_tools_called.append('first')
+            return output
+
+        def process_second(output: OutputTypeWithCount) -> OutputTypeWithCount:  # pragma: no cover
+            output_tools_called.append('second')
+            return output
+
+        def return_model(_: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+            assert info.output_tools is not None
+            return ModelResponse(
+                parts=[
+                    ToolCallPart('first_output', {'value': 'valid'}),
+                    ToolCallPart('second_output', {'value': 'invalid', 'count': 'not_an_int'}),
+                ],
+            )
+
+        agent = Agent(
+            FunctionModel(return_model),
+            output_type=[
+                ToolOutput(process_first, name='first_output'),
+                ToolOutput(process_second, name='second_output'),
+            ],
+            end_strategy='exhaustive',
+        )
+
+        result = agent.run_sync('test exhaustive with schema validation failure')
+
+        assert isinstance(result.output, OutputType)
+        assert result.output.value == 'valid'
+        assert output_tools_called == ['first']
+
+    def test_exhaustive_strategy_second_output_max_retries_exceeded(self):
+        """Test exhaustive strategy when first output succeeds and second exceeds max retries."""
+        output_tools_called: list[str] = []
+
+        def process_first(output: OutputType) -> OutputType:
+            output_tools_called.append('first')
+            return output
+
+        def process_second(output: OutputTypeWithCount) -> OutputTypeWithCount:  # pragma: no cover
+            output_tools_called.append('second')
+            return output
+
+        def return_model(_: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+            assert info.output_tools is not None
+            return ModelResponse(
+                parts=[
+                    ToolCallPart('first_output', {'value': 'valid'}),
+                    ToolCallPart('second_output', {'value': 'invalid', 'count': 'not_an_int'}),
+                ],
+            )
+
+        agent = Agent(
+            FunctionModel(return_model),
+            output_type=[
+                ToolOutput(process_first, name='first_output'),
+                ToolOutput(process_second, name='second_output'),
+            ],
+            end_strategy='exhaustive',
+            output_retries=0,
+        )
+
+        result = agent.run_sync('test exhaustive with max retries exceeded')
+
+        assert isinstance(result.output, OutputType)
+        assert result.output.value == 'valid'
+        assert output_tools_called == ['first']
+
+    def test_early_strategy_second_output_max_retries_exceeded(self):
+        """Test early strategy when first output succeeds and second exceeds max retries."""
+
+        def process_first(output: OutputType) -> OutputType:
+            return output
+
+        def process_second(output: OutputTypeWithCount) -> OutputTypeWithCount:  # pragma: no cover
+            return output
+
+        def return_model(_: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+            assert info.output_tools is not None
+            return ModelResponse(
+                parts=[
+                    ToolCallPart('first_output', {'value': 'valid'}),
+                    ToolCallPart('second_output', {'value': 'invalid', 'count': 'not_an_int'}),
+                ],
+            )
+
+        agent = Agent(
+            FunctionModel(return_model),
+            output_type=[
+                ToolOutput(process_first, name='first_output'),
+                ToolOutput(process_second, name='second_output'),
+            ],
+            end_strategy='early',
+            output_retries=0,
+        )
+
+        result = agent.run_sync('test early with max retries exceeded')
+
+        assert isinstance(result.output, OutputType)
+        assert result.output.value == 'valid'
 
     # NOTE: When changing tests in this class:
     # 1. Follow the existing order
