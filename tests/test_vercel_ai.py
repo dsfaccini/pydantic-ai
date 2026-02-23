@@ -2324,7 +2324,6 @@ async def test_tool_approval_request_emission():
                     )
                 ],
                 timestamp=IsDatetime(),
-                run_id=IsStr(),
             ),
             ModelResponse(
                 parts=[ToolCallPart(tool_name='delete_file', args='{"path": "test.txt"}', tool_call_id='delete_1')],
