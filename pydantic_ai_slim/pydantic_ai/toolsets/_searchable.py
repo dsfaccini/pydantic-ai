@@ -37,6 +37,7 @@ _SEARCH_TOOL_DEF = ToolDefinition(
             }
         },
         'required': ['query'],
+        'additionalProperties': False,
     },
 )
 

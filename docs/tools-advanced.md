@@ -422,7 +422,7 @@ For more information of how `end_strategy` works with both function tools and ou
 
 ## Tool Search
 
-Agents with many tools (e.g. [MCP servers](mcp/client.md) exposing dozens of endpoints) can suffer from context bloat and degraded tool selection. Setting `hidden_until_found=True` on a tool hides it from the model's initial context; a `search_tools` tool is automatically injected so the model can discover hidden tools by keyword when it needs them. This is inspired by Anthropic's [progressive disclosure](https://www.anthropic.com/engineering/building-effective-agents#tool-collection) pattern for large tool collections.
+Agents with many tools (e.g. [MCP servers](mcp/client.md) exposing dozens of endpoints) can suffer from context bloat and degraded tool selection. Setting `hidden_until_found=True` on a tool hides it from the model's initial context; a `search_tools` tool is automatically injected so the model can discover hidden tools by keyword when it needs them. This is inspired by Anthropic's [Tool Search Tool](https://www.anthropic.com/engineering/advanced-tool-use) for managing large tool collections.
 
 For [`@agent.tool`][pydantic_ai.agent.Agent.tool], [`@agent.tool_plain`][pydantic_ai.agent.Agent.tool_plain], [`Tool`][pydantic_ai.tools.Tool], and [`FunctionToolset`][pydantic_ai.toolsets.FunctionToolset], `hidden_until_found` is a `bool`. For [MCP servers](mcp/client.md) and [`FastMCPToolset`][pydantic_ai.toolsets.FastMCPToolset], it accepts `bool | list[str]` — pass a list of tool names to hide only specific tools (names should be the original MCP tool names, before any `tool_prefix` is applied).
 
