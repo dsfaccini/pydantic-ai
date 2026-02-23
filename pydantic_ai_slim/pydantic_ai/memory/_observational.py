@@ -36,8 +36,8 @@ class ObservationalMemory:
     storage: OMStorage
     observer_model: models.Model | models.KnownModelName | str
     reflector_model: models.Model | models.KnownModelName | str | None = None
-    observation_threshold: int = 5000
-    reflection_threshold: int = 10000
+    observation_threshold: int = 30000
+    reflection_threshold: int = 40000
     observe_on: Literal['commit', 'prepare'] = 'commit'
     token_counter: TokenCounter = default_token_counter
     tracer: Tracer | None = None
@@ -216,12 +216,12 @@ class ObservationalMemory:
         else:
             combined = new_observations
 
-        now = datetime.now()
+        observed_at = _max_message_timestamp(unobserved)
         updated = replace(
             record,
             active_observations=combined,
             observation_token_count=self.token_counter(combined),
-            last_observed_at=now,
+            last_observed_at=observed_at,
             generation_count=record.generation_count + 1,
             current_task=output.current_task or record.current_task,
             suggested_continuation=output.suggested_continuation,
@@ -254,10 +254,16 @@ class ObservationalMemory:
         return updated
 
 
+def _max_message_timestamp(messages: list[ModelMessage]) -> datetime:
+    """Return the latest timestamp from a list of messages, falling back to now."""
+    timestamps = [m.timestamp for m in messages if isinstance(m, ModelRequest) and m.timestamp is not None]
+    return max(timestamps) if timestamps else datetime.now()
+
+
 def _message_after(msg: ModelMessage, cutoff: datetime) -> bool:
     """Check if a message was sent after the cutoff time."""
     if isinstance(msg, ModelRequest):
-        return msg.timestamp is not None and msg.timestamp > cutoff
+        return msg.timestamp is None or msg.timestamp > cutoff
     return True
 
 
