@@ -70,7 +70,7 @@ def test_model_request_parameters_are_serializable():
                     'kind': 'function',
                     'metadata': None,
                     'timeout': None,
-                    'defer_loading': False,
+                    'hidden_until_found': False,
                 }
             ],
             'builtin_tools': [
@@ -136,7 +136,7 @@ def test_model_request_parameters_are_serializable():
                     'kind': 'function',
                     'metadata': None,
                     'timeout': None,
-                    'defer_loading': False,
+                    'hidden_until_found': False,
                 }
             ],
             'prompted_output_template': None,

@@ -41,9 +41,9 @@ _SEARCH_TOOL_DEF = ToolDefinition(
 )
 
 
-def should_defer(defer_loading: bool | list[str], tool_name: str) -> bool:
-    """Check whether a tool should have deferred loading based on the defer_loading setting."""
-    return defer_loading is True or (isinstance(defer_loading, list) and tool_name in defer_loading)
+def should_hide(hidden_until_found: bool | list[str], tool_name: str) -> bool:
+    """Check whether a tool should be hidden until found based on the hidden_until_found setting."""
+    return hidden_until_found is True or (isinstance(hidden_until_found, list) and tool_name in hidden_until_found)
 
 
 @dataclass(kw_only=True)
@@ -56,9 +56,9 @@ class SearchableToolset(WrapperToolset[AgentDepsT]):
     """A toolset that enables tool discovery for large toolsets.
 
     This toolset wraps another toolset and provides a `search_tools` tool that allows
-    the model to discover tools marked with `defer_loading=True`.
+    the model to discover tools marked with `hidden_until_found=True`.
 
-    Tools with `defer_loading=True` are not initially presented to the model.
+    Tools with `hidden_until_found=True` are not initially presented to the model.
     Instead, they become available after the model discovers them via the search tool.
     """
 
@@ -68,7 +68,7 @@ class SearchableToolset(WrapperToolset[AgentDepsT]):
         deferred: dict[str, ToolsetTool[AgentDepsT]] = {}
         non_deferred: dict[str, ToolsetTool[AgentDepsT]] = {}
         for name, tool in all_tools.items():
-            if tool.tool_def.defer_loading:
+            if tool.tool_def.hidden_until_found:
                 deferred[name] = tool
             else:
                 non_deferred[name] = tool

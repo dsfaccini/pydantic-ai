@@ -48,17 +48,17 @@ def create_function_toolset() -> FunctionToolset[None]:
         """Get the current time in a timezone."""
         return f'Time in {timezone}'
 
-    @toolset.tool(defer_loading=True)
+    @toolset.tool(hidden_until_found=True)
     def calculate_mortgage(principal: float, rate: float, years: int) -> str:  # pragma: no cover
         """Calculate monthly mortgage payment for a loan."""
         return 'Mortgage calculated'
 
-    @toolset.tool(defer_loading=True)
+    @toolset.tool(hidden_until_found=True)
     def stock_price(symbol: str) -> str:  # pragma: no cover
         """Get the current stock price for a symbol."""
         return f'Stock price for {symbol}'
 
-    @toolset.tool(defer_loading=True)
+    @toolset.tool(hidden_until_found=True)
     def crypto_price(coin: str) -> str:  # pragma: no cover
         """Get the current cryptocurrency price."""
         return f'Crypto price for {coin}'
@@ -213,7 +213,7 @@ async def test_searchable_toolset_reserved_name_collision():
         """Search for tools."""
         return 'search result'
 
-    @toolset.tool(defer_loading=True)
+    @toolset.tool(hidden_until_found=True)
     def deferred_tool() -> str:  # pragma: no cover
         """A deferred tool to trigger search injection."""
         return 'deferred'
@@ -271,7 +271,7 @@ async def test_agent_wraps_in_searchable_with_deferred():
         """Get the current weather for a city."""
         return f'Weather in {city}'
 
-    @agent.tool_plain(defer_loading=True)
+    @agent.tool_plain(hidden_until_found=True)
     def calculate_mortgage(principal: float) -> str:  # pragma: no cover
         """Calculate mortgage payment."""
         return 'Calculated'
@@ -302,7 +302,7 @@ async def test_searchable_toolset_tool_with_none_description():
     """Test that tools with None description are handled correctly in search."""
     toolset: FunctionToolset[None] = FunctionToolset()
 
-    @toolset.tool(defer_loading=True)
+    @toolset.tool(hidden_until_found=True)
     def no_desc_tool() -> str:  # pragma: no cover
         return 'no description'
 
@@ -358,15 +358,15 @@ async def test_searchable_toolset_multiple_searches_accumulate():
 
 
 async def test_function_toolset_all_deferred():
-    """Test FunctionToolset with all tools having defer_loading=True."""
+    """Test FunctionToolset with all tools having hidden_until_found=True."""
     toolset: FunctionToolset[None] = FunctionToolset()
 
-    @toolset.tool(defer_loading=True)
+    @toolset.tool(hidden_until_found=True)
     def deferred_tool1() -> str:  # pragma: no cover
         """First deferred tool."""
         return 'result1'
 
-    @toolset.tool(defer_loading=True)
+    @toolset.tool(hidden_until_found=True)
     def deferred_tool2() -> str:  # pragma: no cover
         """Second deferred tool."""
         return 'result2'

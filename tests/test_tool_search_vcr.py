@@ -104,7 +104,7 @@ async def test_tool_search_discovers_and_uses_tool(allow_model_requests: None, c
         """Get the current weather for a city."""
         return f'The weather in {city} is sunny and 72°F.'
 
-    @agent.tool_plain(defer_loading=True)
+    @agent.tool_plain(hidden_until_found=True)
     def mortgage_calculator(principal: float, rate: float, years: int) -> str:
         """Mortgage calculator - calculate monthly mortgage payment for a home loan."""
         monthly_rate = rate / 12 / 100
@@ -119,7 +119,7 @@ async def test_tool_search_discovers_and_uses_tool(allow_model_requests: None, c
             )
         return f'Monthly payment: ${payment:.2f}'
 
-    @agent.tool_plain(defer_loading=True)
+    @agent.tool_plain(hidden_until_found=True)
     def stock_lookup(symbol: str) -> str:  # pragma: no cover
         """Look up stock price by ticker symbol."""
         return f'Stock {symbol}: $150.00'

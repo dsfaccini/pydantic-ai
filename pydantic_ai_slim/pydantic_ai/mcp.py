@@ -24,7 +24,7 @@ from typing_extensions import Self, assert_never, deprecated
 from pydantic_ai.tools import RunContext, ToolDefinition
 
 from .direct import model_request
-from .toolsets._searchable import should_defer
+from .toolsets._searchable import should_hide
 from .toolsets.abstract import AbstractToolset, ToolsetTool
 
 try:
@@ -360,12 +360,14 @@ class MCPServer(AbstractToolset[Any], ABC):
     Set to `False` for servers that change resources dynamically without sending notifications.
     """
 
-    defer_loading: bool | list[str]
-    """Whether to defer loading tools until they are discovered via tool search.
+    hidden_until_found: bool | list[str]
+    """Whether to hide tools from the model until they are discovered via tool search.
+
+    See [Tool Search](tools-advanced.md#tool-search) for more info.
 
     - `False` (default): All tools are visible to the model.
-    - `True`: All tools have `defer_loading=True`.
-    - `list[str]`: Only the named tools have `defer_loading=True`.
+    - `True`: All tools have `hidden_until_found=True`.
+    - `list[str]`: Only the named tools have `hidden_until_found=True`.
       Names should be the original MCP tool names, before any `tool_prefix` is applied.
     """
 
@@ -401,7 +403,7 @@ class MCPServer(AbstractToolset[Any], ABC):
         cache_tools: bool = True,
         cache_resources: bool = True,
         *,
-        defer_loading: bool | list[str] = False,
+        hidden_until_found: bool | list[str] = False,
         id: str | None = None,
         client_info: mcp_types.Implementation | None = None,
     ):
@@ -417,7 +419,7 @@ class MCPServer(AbstractToolset[Any], ABC):
         self.elicitation_callback = elicitation_callback
         self.cache_tools = cache_tools
         self.cache_resources = cache_resources
-        self.defer_loading = defer_loading
+        self.hidden_until_found = hidden_until_found
         self.client_info = client_info
 
         self._id = id or tool_prefix
@@ -593,7 +595,7 @@ class MCPServer(AbstractToolset[Any], ABC):
                     name=name,
                     description=mcp_tool.description,
                     parameters_json_schema=mcp_tool.inputSchema,
-                    defer_loading=should_defer(self.defer_loading, mcp_tool.name),
+                    hidden_until_found=should_hide(self.hidden_until_found, mcp_tool.name),
                     metadata={
                         'meta': mcp_tool.meta,
                         'annotations': mcp_tool.annotations.model_dump() if mcp_tool.annotations else None,
@@ -878,7 +880,7 @@ class MCPServerStdio(MCPServer):
     elicitation_callback: ElicitationFnT | None = None
     cache_tools: bool
     cache_resources: bool
-    defer_loading: bool | list[str]
+    hidden_until_found: bool | list[str]
 
     def __init__(
         self,
@@ -899,7 +901,7 @@ class MCPServerStdio(MCPServer):
         elicitation_callback: ElicitationFnT | None = None,
         cache_tools: bool = True,
         cache_resources: bool = True,
-        defer_loading: bool | list[str] = False,
+        hidden_until_found: bool | list[str] = False,
         id: str | None = None,
         client_info: mcp_types.Implementation | None = None,
     ):
@@ -924,8 +926,8 @@ class MCPServerStdio(MCPServer):
                 See [`MCPServer.cache_tools`][pydantic_ai.mcp.MCPServer.cache_tools].
             cache_resources: Whether to cache the list of resources.
                 See [`MCPServer.cache_resources`][pydantic_ai.mcp.MCPServer.cache_resources].
-            defer_loading: Whether tools should be deferred for tool search.
-                See [`MCPServer.defer_loading`][pydantic_ai.mcp.MCPServer.defer_loading].
+            hidden_until_found: Whether to hide tools from the model until discovered via tool search.
+                See [`MCPServer.hidden_until_found`][pydantic_ai.mcp.MCPServer.hidden_until_found] and [Tool Search](tools-advanced.md#tool-search) for more info.
             id: An optional unique ID for the MCP server. An MCP server needs to have an ID in order to be used in a durable execution environment like Temporal, in which case the ID will be used to identify the server's activities within the workflow.
             client_info: Information describing the MCP client implementation.
         """
@@ -947,7 +949,7 @@ class MCPServerStdio(MCPServer):
             elicitation_callback,
             cache_tools,
             cache_resources,
-            defer_loading=defer_loading,
+            hidden_until_found=hidden_until_found,
             id=id,
             client_info=client_info,
         )
@@ -1050,7 +1052,7 @@ class _MCPServerHTTP(MCPServer):
     elicitation_callback: ElicitationFnT | None = None
     cache_tools: bool
     cache_resources: bool
-    defer_loading: bool | list[str]
+    hidden_until_found: bool | list[str]
 
     def __init__(
         self,
@@ -1071,7 +1073,7 @@ class _MCPServerHTTP(MCPServer):
         elicitation_callback: ElicitationFnT | None = None,
         cache_tools: bool = True,
         cache_resources: bool = True,
-        defer_loading: bool | list[str] = False,
+        hidden_until_found: bool | list[str] = False,
         client_info: mcp_types.Implementation | None = None,
         **_deprecated_kwargs: Any,
     ):
@@ -1096,8 +1098,8 @@ class _MCPServerHTTP(MCPServer):
                 See [`MCPServer.cache_tools`][pydantic_ai.mcp.MCPServer.cache_tools].
             cache_resources: Whether to cache the list of resources.
                 See [`MCPServer.cache_resources`][pydantic_ai.mcp.MCPServer.cache_resources].
-            defer_loading: Whether tools should be deferred for tool search.
-                See [`MCPServer.defer_loading`][pydantic_ai.mcp.MCPServer.defer_loading].
+            hidden_until_found: Whether to hide tools from the model until discovered via tool search.
+                See [`MCPServer.hidden_until_found`][pydantic_ai.mcp.MCPServer.hidden_until_found] and [Tool Search](tools-advanced.md#tool-search) for more info.
             client_info: Information describing the MCP client implementation.
         """
         if 'sse_read_timeout' in _deprecated_kwargs:
@@ -1131,7 +1133,7 @@ class _MCPServerHTTP(MCPServer):
             elicitation_callback=elicitation_callback,
             cache_tools=cache_tools,
             cache_resources=cache_resources,
-            defer_loading=defer_loading,
+            hidden_until_found=hidden_until_found,
             id=id,
             client_info=client_info,
         )
