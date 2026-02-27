@@ -12,7 +12,6 @@ from typing import Any
 import httpx
 import pytest
 from asgi_lifespan import LifespanManager
-from dirty_equals import IsStr
 from pydantic import BaseModel
 
 from pydantic_ai import (
@@ -62,12 +61,11 @@ from pydantic_ai.output import OutputDataT
 from pydantic_ai.tools import AgentDepsT, ToolDefinition
 
 from ._inline_snapshot import snapshot
-from .conftest import IsDatetime, IsInt, IsSameStr, try_import
+from .conftest import IsDatetime, IsInt, IsSameStr, IsStr, try_import
 
 with try_import() as imports_successful:
     from ag_ui.core import (
         ActivityMessage,
-        ActivitySnapshotEvent,
         AssistantMessage,
         BaseEvent,
         BinaryInputContent,
@@ -76,11 +74,11 @@ with try_import() as imports_successful:
         EventType,
         FunctionCall,
         Message,
+        ReasoningMessage,
         RunAgentInput,
         StateSnapshotEvent,
         SystemMessage,
         TextInputContent,
-        ThinkingEndEvent,
         Tool,
         ToolCall,
         ToolMessage,
@@ -1065,16 +1063,8 @@ async def test_thinking() -> None:
                 'threadId': (thread_id := IsSameStr()),
                 'runId': (run_id := IsSameStr()),
             },
-            {'type': 'THINKING_START', 'timestamp': IsInt()},
-            {'type': 'THINKING_END', 'timestamp': IsInt()},
-            {
-                'type': 'ACTIVITY_SNAPSHOT',
-                'timestamp': IsInt(),
-                'activityType': 'pydantic_ai_thinking',
-                'messageId': IsStr(),
-                'content': {'content': ''},
-                'replace': True,
-            },
+            {'type': 'REASONING_START', 'timestamp': IsInt(), 'messageId': IsStr()},
+            {'type': 'REASONING_END', 'timestamp': IsInt(), 'messageId': IsStr()},
             {
                 'type': 'TEXT_MESSAGE_START',
                 'timestamp': IsInt(),
@@ -1094,34 +1084,53 @@ async def test_thinking() -> None:
                 'delta': ' and some more',
             },
             {'type': 'TEXT_MESSAGE_END', 'timestamp': IsInt(), 'messageId': message_id},
-            {'type': 'THINKING_START', 'timestamp': IsInt()},
-            {'type': 'THINKING_TEXT_MESSAGE_START', 'timestamp': IsInt()},
-            {'type': 'THINKING_TEXT_MESSAGE_CONTENT', 'timestamp': IsInt(), 'delta': 'Thinking '},
-            {'type': 'THINKING_TEXT_MESSAGE_CONTENT', 'timestamp': IsInt(), 'delta': 'about the weather'},
-            {'type': 'THINKING_TEXT_MESSAGE_END', 'timestamp': IsInt()},
-            {'type': 'THINKING_TEXT_MESSAGE_START', 'timestamp': IsInt()},
+            {'type': 'REASONING_START', 'timestamp': IsInt(), 'messageId': (reasoning_id := IsSameStr())},
             {
-                'type': 'THINKING_TEXT_MESSAGE_CONTENT',
+                'type': 'REASONING_MESSAGE_START',
                 'timestamp': IsInt(),
+                'messageId': reasoning_id,
+                'role': 'assistant',
+            },
+            {
+                'type': 'REASONING_MESSAGE_CONTENT',
+                'timestamp': IsInt(),
+                'messageId': reasoning_id,
+                'delta': 'Thinking ',
+            },
+            {
+                'type': 'REASONING_MESSAGE_CONTENT',
+                'timestamp': IsInt(),
+                'messageId': reasoning_id,
+                'delta': 'about the weather',
+            },
+            {'type': 'REASONING_MESSAGE_END', 'timestamp': IsInt(), 'messageId': reasoning_id},
+            {
+                'type': 'REASONING_MESSAGE_START',
+                'timestamp': IsInt(),
+                'messageId': reasoning_id,
+                'role': 'assistant',
+            },
+            {
+                'type': 'REASONING_MESSAGE_CONTENT',
+                'timestamp': IsInt(),
+                'messageId': reasoning_id,
                 'delta': 'Thinking about the meaning of life',
             },
-            {'type': 'THINKING_TEXT_MESSAGE_END', 'timestamp': IsInt()},
-            {'type': 'THINKING_TEXT_MESSAGE_START', 'timestamp': IsInt()},
+            {'type': 'REASONING_MESSAGE_END', 'timestamp': IsInt(), 'messageId': reasoning_id},
             {
-                'type': 'THINKING_TEXT_MESSAGE_CONTENT',
+                'type': 'REASONING_MESSAGE_START',
                 'timestamp': IsInt(),
+                'messageId': reasoning_id,
+                'role': 'assistant',
+            },
+            {
+                'type': 'REASONING_MESSAGE_CONTENT',
+                'timestamp': IsInt(),
+                'messageId': reasoning_id,
                 'delta': 'Thinking about the universe',
             },
-            {'type': 'THINKING_TEXT_MESSAGE_END', 'timestamp': IsInt()},
-            {'type': 'THINKING_END', 'timestamp': IsInt()},
-            {
-                'type': 'ACTIVITY_SNAPSHOT',
-                'timestamp': IsInt(),
-                'activityType': 'pydantic_ai_thinking',
-                'messageId': IsStr(),
-                'content': {'content': 'Thinking about the universe'},
-                'replace': True,
-            },
+            {'type': 'REASONING_MESSAGE_END', 'timestamp': IsInt(), 'messageId': reasoning_id},
+            {'type': 'REASONING_END', 'timestamp': IsInt(), 'messageId': reasoning_id},
             {
                 'type': 'RUN_FINISHED',
                 'timestamp': IsInt(),
@@ -1133,7 +1142,7 @@ async def test_thinking() -> None:
 
 
 async def test_thinking_with_signature() -> None:
-    """Test that ActivitySnapshotEvent is emitted after ThinkingEndEvent with metadata."""
+    """Test that ReasoningEncryptedValueEvent is emitted with thinking metadata."""
 
     async def stream_function(
         messages: list[ModelMessage], agent_info: AgentInfo
@@ -1157,23 +1166,28 @@ async def test_thinking_with_signature() -> None:
                 'threadId': (thread_id := IsSameStr()),
                 'runId': (run_id := IsSameStr()),
             },
-            {'type': 'THINKING_START', 'timestamp': IsInt()},
-            {'type': 'THINKING_TEXT_MESSAGE_START', 'timestamp': IsInt()},
-            {'type': 'THINKING_TEXT_MESSAGE_CONTENT', 'timestamp': IsInt(), 'delta': 'Thinking deeply'},
-            {'type': 'THINKING_TEXT_MESSAGE_END', 'timestamp': IsInt()},
-            {'type': 'THINKING_END', 'timestamp': IsInt()},
+            {'type': 'REASONING_START', 'timestamp': IsInt(), 'messageId': (reasoning_id := IsSameStr())},
             {
-                'type': 'ACTIVITY_SNAPSHOT',
+                'type': 'REASONING_MESSAGE_START',
                 'timestamp': IsInt(),
-                'activityType': 'pydantic_ai_thinking',
-                'messageId': IsStr(),
-                'content': {
-                    'content': 'Thinking deeply',
-                    'signature': 'sig_abc123',
-                    'provider_name': 'function',
-                },
-                'replace': True,
+                'messageId': reasoning_id,
+                'role': 'assistant',
             },
+            {
+                'type': 'REASONING_MESSAGE_CONTENT',
+                'timestamp': IsInt(),
+                'messageId': reasoning_id,
+                'delta': 'Thinking deeply',
+            },
+            {'type': 'REASONING_MESSAGE_END', 'timestamp': IsInt(), 'messageId': reasoning_id},
+            {
+                'type': 'REASONING_ENCRYPTED_VALUE',
+                'timestamp': IsInt(),
+                'subtype': 'message',
+                'entityId': reasoning_id,
+                'encryptedValue': IsStr(),
+            },
+            {'type': 'REASONING_END', 'timestamp': IsInt(), 'messageId': reasoning_id},
             {
                 'type': 'TEXT_MESSAGE_START',
                 'timestamp': IsInt(),
@@ -1192,20 +1206,21 @@ async def test_thinking_with_signature() -> None:
     )
 
 
-def test_activity_message_thinking_roundtrip() -> None:
-    """Test that ActivityMessage with pydantic_ai_thinking converts to ThinkingPart."""
+def test_reasoning_message_thinking_roundtrip() -> None:
+    """Test that ReasoningMessage converts to ThinkingPart with metadata from encrypted_value."""
     messages = AGUIAdapter.load_messages(
         [
-            ActivityMessage(
-                id='activity-1',
-                activity_type='pydantic_ai_thinking',
-                content={
-                    'content': 'Let me think about this...',
-                    'id': 'thinking-1',
-                    'signature': 'sig_abc123',
-                    'provider_name': 'anthropic',
-                    'provider_details': {'some': 'details'},
-                },
+            ReasoningMessage(
+                id='reasoning-1',
+                content='Let me think about this...',
+                encrypted_value=json.dumps(
+                    {
+                        'id': 'thinking-1',
+                        'signature': 'sig_abc123',
+                        'provider_name': 'anthropic',
+                        'provider_details': {'some': 'details'},
+                    }
+                ),
             ),
             AssistantMessage(id='msg-1', content='Here is my response'),
         ]
@@ -1230,8 +1245,8 @@ def test_activity_message_thinking_roundtrip() -> None:
     )
 
 
-async def test_thinking_end_event_with_all_metadata() -> None:
-    """Test that ActivitySnapshotEvent includes all metadata fields (id, signature, provider_name, provider_details)."""
+async def test_reasoning_events_with_all_metadata() -> None:
+    """Test that REASONING_* events emit encryptedValue with all metadata fields."""
     run_input = create_input(UserMessage(id='msg_1', content='test'))
     event_stream = AGUIEventStream(run_input, accept=SSE_CONTENT_TYPE)
 
@@ -1243,22 +1258,25 @@ async def test_thinking_end_event_with_all_metadata() -> None:
         provider_details={'model': 'claude-sonnet-4-5'},
     )
 
-    events = [e async for e in event_stream.handle_thinking_end(part, followed_by_thinking=False)]
+    events: list[BaseEvent] = []
+    async for e in event_stream.handle_thinking_start(part, follows_thinking=False):
+        events.append(e)
+    async for e in event_stream.handle_thinking_end(part, followed_by_thinking=False):
+        events.append(e)
 
-    assert events == snapshot(
+    assert [e.model_dump(exclude_none=True) for e in events] == snapshot(
         [
-            ThinkingEndEvent(),
-            ActivitySnapshotEvent(
-                message_id='thinking-123',
-                activity_type='pydantic_ai_thinking',
-                content={
-                    'content': 'Thinking content',
-                    'id': 'thinking-123',
-                    'signature': 'sig_xyz',
-                    'provider_name': 'anthropic',
-                    'provider_details': {'model': 'claude-sonnet-4-5'},
-                },
-            ),
+            {'type': 'REASONING_START', 'message_id': IsStr()},
+            {'type': 'REASONING_MESSAGE_START', 'message_id': IsStr(), 'role': 'assistant'},
+            {'type': 'REASONING_MESSAGE_CONTENT', 'message_id': IsStr(), 'delta': 'Thinking content'},
+            {'type': 'REASONING_MESSAGE_END', 'message_id': IsStr()},
+            {
+                'type': 'REASONING_ENCRYPTED_VALUE',
+                'subtype': 'message',
+                'entity_id': IsStr(),
+                'encrypted_value': '{"id": "thinking-123", "signature": "sig_xyz", "provider_name": "anthropic", "provider_details": {"model": "claude-sonnet-4-5"}}',
+            },
+            {'type': 'REASONING_END', 'message_id': IsStr()},
         ]
     )
 

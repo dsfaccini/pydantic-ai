@@ -118,7 +118,7 @@ ui = ["starlette>=0.45.3"]
 # A2A
 a2a = ["fasta2a>=0.4.1"]
 # AG-UI
-ag-ui = ["ag-ui-protocol>=0.1.10", "starlette>=0.45.3"]
+ag-ui = ["ag-ui-protocol>=0.1.13", "starlette>=0.45.3"]
 # Web
 web = ["starlette>=0.45.3", "httpx>=0.27.0", "uvicorn>=0.38.0"]
 # Retries
@@ -138,6 +138,16 @@ pai = "pydantic_ai._cli:cli_exit" # TODO remove this when clai has been out for 
 
 [tool.hatch.build.targets.wheel]
 packages = ["pydantic_ai"]
+
+# Remove when https://github.com/vllm-project/vllm/pull/30566 is merged.
+# Check compatibility with `uv lock --upgrade-package vllm --upgrade-package transformers`.
+[tool.uv]
+conflicts = [
+    [
+        { extra = "huggingface" },
+        { extra = "outlines-vllm-offline" },
+    ],
+]
 
 [tool.uv.sources]
 pydantic-graph = { workspace = true }

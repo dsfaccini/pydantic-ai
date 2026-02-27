@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from base64 import b64decode
 from collections.abc import Mapping, Sequence
@@ -49,6 +50,7 @@ try:
         DeveloperMessage,
         FunctionCall,
         Message,
+        ReasoningMessage,
         RunAgentInput,
         SystemMessage,
         TextInputContent,
@@ -260,21 +262,23 @@ class AGUIAdapter(UIAdapter[RunAgentInput, Message, BaseEvent, AgentDepsT, Outpu
                             )
                         )
 
-                case ActivityMessage() as activity_msg:
-                    # Round-trip from ActivitySnapshotEvent emitted by _event_stream.py.
-                    # See: https://docs.ag-ui.com/concepts/messages#activitymessage
-                    content = activity_msg.content
-                    if activity_msg.activity_type == 'pydantic_ai_thinking':
-                        builder.add(
-                            ThinkingPart(
-                                content=content.get('content', ''),
-                                id=content.get('id'),
-                                signature=content.get('signature'),
-                                provider_name=content.get('provider_name'),
-                                provider_details=content.get('provider_details'),
-                            )
+                case ReasoningMessage() as reasoning_msg:
+                    metadata: dict[str, Any] = (
+                        json.loads(reasoning_msg.encrypted_value) if reasoning_msg.encrypted_value else {}
+                    )
+                    builder.add(
+                        ThinkingPart(
+                            content=reasoning_msg.content,
+                            id=metadata.get('id'),
+                            signature=metadata.get('signature'),
+                            provider_name=metadata.get('provider_name'),
+                            provider_details=metadata.get('provider_details'),
                         )
-                    elif activity_msg.activity_type == 'pydantic_ai_file':
+                    )
+
+                case ActivityMessage() as activity_msg:
+                    content = activity_msg.content
+                    if activity_msg.activity_type == 'pydantic_ai_file':
                         builder.add(
                             FilePart(
                                 content=BinaryContent.from_data_uri(content.get('url', '')),
@@ -284,8 +288,8 @@ class AGUIAdapter(UIAdapter[RunAgentInput, Message, BaseEvent, AgentDepsT, Outpu
                             )
                         )
 
-                case _:  # pragma: no cover
-                    raise ValueError(f'Unsupported message type: {type(msg)}')
+                case _:
+                    assert_never(msg)
 
         return builder.messages
 
@@ -361,15 +365,15 @@ class AGUIAdapter(UIAdapter[RunAgentInput, Message, BaseEvent, AgentDepsT, Outpu
             if isinstance(part, TextPart):
                 text_content.append(part.content)
             elif isinstance(part, ThinkingPart):
-                thinking_content: dict[str, Any] = {'content': part.content}
-                for attr in ['id', 'signature', 'provider_name', 'provider_details']:
-                    if getattr(part, attr) is not None:
-                        thinking_content[attr] = getattr(part, attr)
+                encrypted: dict[str, Any] = {}
+                for attr in ('id', 'signature', 'provider_name', 'provider_details'):
+                    if (value := getattr(part, attr)) is not None:
+                        encrypted[attr] = value
                 result.append(
-                    ActivityMessage(
+                    ReasoningMessage(
                         id=_new_message_id(),
-                        activity_type='pydantic_ai_thinking',
-                        content=thinking_content,
+                        content=part.content,
+                        encrypted_value=json.dumps(encrypted) if encrypted else None,
                     )
                 )
             elif isinstance(part, ToolCallPart):
@@ -395,8 +399,8 @@ class AGUIAdapter(UIAdapter[RunAgentInput, Message, BaseEvent, AgentDepsT, Outpu
                     'media_type': part.content.media_type,
                 }
                 for attr in ['id', 'provider_name', 'provider_details']:
-                    if getattr(part, attr) is not None:
-                        file_content[attr] = getattr(part, attr)
+                    if (value := getattr(part, attr)) is not None:
+                        file_content[attr] = value
                 result.append(
                     ActivityMessage(
                         id=_new_message_id(),
