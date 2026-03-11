@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import itertools
 import os
 import re
 import warnings
@@ -284,12 +285,14 @@ TOOL_SCHEMA_VALIDATOR = pydantic_core.SchemaValidator(
 _ENV_VAR_PATTERN = re.compile(r'\$\{([^}:]+)(:-([^}]*))?\}')
 
 
-_next_conn_id: int = 0
+_conn_id_counter = itertools.count()
 
 # Maps server id(self) → connection ID for the current context.
-# Child tasks inherit the parent's context, so graph node tasks
-# share the parent's MCP connection. Separate user-level tasks
-# get independent contexts and thus independent connections.
+# A mutable dict is used intentionally: child tasks inherit the parent's
+# reference via ContextVar copy-on-write semantics, so graph node tasks
+# automatically share the parent's MCP connection without extra plumbing.
+# Separate user-level tasks get independent contexts and thus independent
+# connections. All mutations to this dict are protected by _enter_lock.
 _mcp_conn_ctx: ContextVar[dict[int, int]] = ContextVar('_mcp_conn_ctx')
 
 
@@ -750,23 +753,41 @@ class MCPServer(AbstractToolset[Any], ABC):
         connection so that cancel scopes are entered and exited in the same task.
         Reentrant access within the same context increments a reference count.
         """
-        global _next_conn_id
-        conn_id = self._get_conn_id()
+        # Fast path under lock: if a connection already exists for this context, just bump ref_count
         async with self._enter_lock:
+            conn_id = self._get_conn_id()
             if conn_id is not None and conn_id in self._connections:
                 self._connections[conn_id].ref_count += 1
+                return self
+
+        # Slow path: open a new connection without holding the lock (_open_connection
+        # spawns a subprocess + performs MCP init handshake, so we don't want to
+        # serialize all concurrent connection setups behind _enter_lock)
+        conn = await self._open_connection()
+
+        # Re-acquire lock to register the connection; re-check in case a concurrent
+        # __aenter__ from the same ContextVar context raced us and already registered one
+        orphaned_conn: _MCPConnectionState | None = None
+        async with self._enter_lock:
+            conn_id = self._get_conn_id()
+            if conn_id is not None and conn_id in self._connections:
+                # Another task from the same context won the race — reuse its connection
+                self._connections[conn_id].ref_count += 1
+                orphaned_conn = conn
             else:
-                conn = await self._open_connection()
-                conn_id = _next_conn_id
-                _next_conn_id += 1
+                conn_id = next(_conn_id_counter)
                 self._connections[conn_id] = conn
-                # Set the connection ID in the current context so child tasks inherit it
                 try:
                     conn_ctx = _mcp_conn_ctx.get()
                 except LookupError:
                     conn_ctx: dict[int, int] = {}
                     _mcp_conn_ctx.set(conn_ctx)
                 conn_ctx[id(self)] = conn_id
+
+        # Clean up the orphaned connection outside the lock
+        if orphaned_conn is not None:
+            await orphaned_conn.exit_stack.aclose()
+
         return self
 
     async def __aexit__(self, *args: Any) -> bool | None:
@@ -780,6 +801,10 @@ class MCPServer(AbstractToolset[Any], ABC):
             if conn.ref_count == 0:
                 del self._connections[conn_id]
                 conn_to_close = conn
+                try:
+                    _mcp_conn_ctx.get().pop(id(self), None)
+                except LookupError:
+                    pass
                 if not self._connections:
                     self._cached_tools = None
                     self._cached_resources = None

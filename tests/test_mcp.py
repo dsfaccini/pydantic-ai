@@ -7,7 +7,7 @@ import base64
 import re
 from datetime import timezone
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -24,7 +24,7 @@ from pydantic_ai import (
     ToolReturnPart,
     UserPromptPart,
 )
-from pydantic_ai.agent import Agent
+from pydantic_ai.agent import Agent, AgentRunResult
 from pydantic_ai.exceptions import (
     ModelRetry,
     UnexpectedModelBehavior,
@@ -150,12 +150,19 @@ async def test_parallel_agent_runs():
     server = MCPServerStdio('python', ['-m', 'tests.mcp_server'])
     agent = Agent(TestModel(call_tools=['celsius_to_fahrenheit']), toolsets=[server])
 
-    async def run_agent(celsius: int) -> str:
-        result = await agent.run(f'Convert {celsius}C to F')
-        return result.output
+    async def run_agent(celsius: int) -> AgentRunResult[str]:
+        return await agent.run(f'Convert {celsius}C to F')
 
-    results = await asyncio.gather(run_agent(0), run_agent(100), run_agent(50))
-    assert len(results) == 3
+    r0, r100, r50 = await asyncio.gather(run_agent(0), run_agent(100), run_agent(50))
+
+    for r in (r0, r100, r50):
+        tool_calls = [
+            m
+            for m in r.all_messages()
+            if isinstance(m, ModelRequest) and any(isinstance(p, ToolReturnPart) for p in m.parts)
+        ]
+        assert len(tool_calls) >= 1, f'Expected at least one tool call, got: {r.all_messages()}'
+
     assert not server.is_running
 
 
@@ -194,31 +201,21 @@ async def test_aexit_concurrent_does_not_corrupt_connections():
     """Regression test: concurrent __aexit__ calls must not corrupt connection state.
 
     With per-context connections, each context tracks its own connection via ContextVar.
-    Concurrent exits from the same context should still be safe — one succeeds,
-    the other raises ValueError.
+    Concurrent exits from the same context should still be safe — the lock ensures
+    one exit succeeds and the other raises ValueError.
+
+    Uses a real server connection established through the public API, then replaces
+    the exit_stack with a mock to avoid cancel scope issues from closing real
+    resources within asyncio.gather (which runs in a single task).
     """
     server = MCPServerStdio('python', ['-m', 'tests.mcp_server'])
 
-    # Simulate one active connection for this context.
-    from pydantic_ai.mcp import _mcp_conn_ctx, _MCPConnectionState  # pyright: ignore[reportPrivateUsage]
-
-    conn_id = 0
-    mock_exit_stack = AsyncMock()
-    mock_client = AsyncMock()
-    server._connections[conn_id] = _MCPConnectionState(  # pyright: ignore[reportPrivateUsage]
-        exit_stack=mock_exit_stack,
-        client=mock_client,
-        ref_count=1,
-    )
-    _mcp_conn_ctx.set({id(server): conn_id})
-
-    # Replace the real lock with one that yields before acquiring.
-    class InterleavingLock(asyncio.Lock):
-        async def acquire(self) -> Literal[True]:
-            await asyncio.sleep(0)
-            return await super().acquire()
-
-    server._enter_lock = InterleavingLock()  # pyright: ignore[reportPrivateUsage]
+    await server.__aenter__()
+    conn_id = server._get_conn_id()  # pyright: ignore[reportPrivateUsage]
+    assert conn_id is not None
+    conn = server._connections[conn_id]  # pyright: ignore[reportPrivateUsage]
+    real_exit_stack = conn.exit_stack
+    conn.exit_stack = AsyncMock()
 
     results = await asyncio.gather(
         server.__aexit__(None, None, None),
@@ -228,7 +225,9 @@ async def test_aexit_concurrent_does_not_corrupt_connections():
 
     errors = [r for r in results if isinstance(r, ValueError)]
     assert len(errors) == 1, f'Expected 1 ValueError, got {len(errors)}: {results}'
-    assert conn_id not in server._connections  # pyright: ignore[reportPrivateUsage]
+    assert not server.is_running
+
+    await real_exit_stack.aclose()
 
 
 async def test_stdio_server_with_tool_prefix(run_context: RunContext[int]):
