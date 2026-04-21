@@ -150,6 +150,33 @@ async def main():
     #> The weather in Paris is sunny and 26 degrees Celsius.
 ```
 
+## Concurrency
+
+Pydantic AI scopes each MCP server connection to a [`contextvars.Context`][contextvars.Context]:
+
+- Concurrent user-level tasks that each enter the same server — for example `asyncio.gather(agent.run(...), agent.run(...))` or two independent `asyncio.create_task(...)` calls — run in separately copied contexts, so each opens its own connection (and, for `MCPServerStdio`, its own subprocess). This ensures cancel scopes are entered and exited on the same task and avoids the `attempted to exit cancel scope in a different task` error.
+- Child tasks spawned from within an active `async with server:` block inherit the parent's context and share its connection; nested `async with` blocks on the same server just bump a reference count.
+
+If you want concurrent user-level tasks to share a single connection, enter the server once in the common parent and let the child tasks inherit it:
+
+```py {title="shared_mcp_connection.py" test="skip"}
+import asyncio
+
+from pydantic_ai import Agent
+from pydantic_ai.mcp import MCPServerStdio
+
+server = MCPServerStdio('python', ['-m', 'mcp_server'])
+agent = Agent('openai:gpt-5.2', toolsets=[server])
+
+
+async def main():
+    async with server:
+        await asyncio.gather(
+            agent.run('first question'),
+            agent.run('second question'),
+        )
+```
+
 ## Loading MCP Servers from Configuration
 
 Instead of creating MCP server instances individually in code, you can load multiple servers from a JSON configuration file using [`load_mcp_servers()`][pydantic_ai.mcp.load_mcp_servers].

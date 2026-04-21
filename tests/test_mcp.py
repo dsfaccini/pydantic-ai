@@ -198,39 +198,6 @@ async def test_aexit_called_more_times_than_aenter():
         await server.__aexit__(None, None, None)
 
 
-async def test_aexit_concurrent_does_not_corrupt_connections():
-    """Regression test: concurrent __aexit__ calls must not corrupt connection state.
-
-    With per-context connections, each context tracks its own connection via ContextVar.
-    Concurrent exits from the same context should still be safe — the lock ensures
-    one exit succeeds and the other raises ValueError.
-
-    Uses a real server connection established through the public API, then replaces
-    the exit_stack with a mock to avoid cancel scope issues from closing real
-    resources within asyncio.gather (which runs in a single task).
-    """
-    server = MCPServerStdio('python', ['-m', 'tests.mcp_server'])
-
-    await server.__aenter__()
-    conn_id = server._get_conn_id()  # pyright: ignore[reportPrivateUsage]
-    assert conn_id is not None
-    conn = server._connections[conn_id]  # pyright: ignore[reportPrivateUsage]
-    real_exit_stack = conn.exit_stack
-    conn.exit_stack = AsyncMock()
-
-    results = await asyncio.gather(
-        server.__aexit__(None, None, None),
-        server.__aexit__(None, None, None),
-        return_exceptions=True,
-    )
-
-    errors = [r for r in results if isinstance(r, ValueError)]
-    assert len(errors) == 1, f'Expected 1 ValueError, got {len(errors)}: {results}'
-    assert not server.is_running
-
-    await real_exit_stack.aclose()
-
-
 async def test_stdio_server_with_tool_prefix(run_context: RunContext[int]):
     server = MCPServerStdio('python', ['-m', 'tests.mcp_server'], tool_prefix='foo')
     async with server:

@@ -454,7 +454,7 @@ class MCPServer(AbstractToolset[Any], ABC):
 
     def __post_init__(self):
         self._enter_lock = Lock()
-        self._connections: dict[int, _MCPConnectionState] = {}
+        self._connections = {}
         self._cached_tools = None
         self._cached_resources = None
 
@@ -793,9 +793,14 @@ class MCPServer(AbstractToolset[Any], ABC):
         This will initialize the connection to the server.
         If this server is an [`MCPServerStdio`][pydantic_ai.mcp.MCPServerStdio], the server will first be started as a subprocess.
 
-        Each context (user-level task and its graph child tasks) gets its own
-        connection so that cancel scopes are entered and exited in the same task.
-        Reentrant access within the same context increments a reference count.
+        Connections are scoped per [`contextvars.Context`][contextvars.Context]:
+
+        - Concurrent user-level tasks (e.g. `asyncio.gather(agent.run(...), agent.run(...))`)
+          each run in their own copied context and therefore get their own connection,
+          ensuring cancel scopes are entered and exited in the same task.
+        - Child tasks spawned from within an active `async with server:` block
+          (such as graph node tasks) inherit the parent's context and share its
+          connection; each nested `async with` increments a reference count.
         """
         # Fast path under lock: if a connection already exists for this context, just bump ref_count
         async with self._enter_lock:
@@ -853,7 +858,7 @@ class MCPServer(AbstractToolset[Any], ABC):
                     self._cached_tools = None
                     self._cached_resources = None
         # Close outside the lock — same task as open, so cancel scopes are safe
-        if conn_to_close:
+        if conn_to_close is not None:
             await conn_to_close.exit_stack.aclose()
 
     @property
