@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pai-docs-preview",
+  "compatibility_date": "2025-06-17",
+  "workers_dev": true,
+  "assets": {
+    "directory": "../../unified-docs/dist",
+    "not_found_handling": "404-page"
+  }
+}

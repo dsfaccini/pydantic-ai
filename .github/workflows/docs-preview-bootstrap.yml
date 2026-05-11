@@ -1,0 +1,50 @@
+name: Docs Preview Bootstrap
+
+# One-time setup for the `pai-docs-preview` Cloudflare Worker that hosts
+# label-triggered docs previews. `wrangler versions upload` (used by the
+# main docs-preview workflow) fails on first-ever deploy of a Worker name,
+# so this workflow does a single `wrangler deploy` of a placeholder to
+# create the Worker. Every subsequent PR preview uploads as a versioned
+# alias and does not touch the production deployment.
+#
+# Run once after merging the docs-preview machinery, or re-run if the Worker
+# is ever deleted from the Cloudflare dashboard.
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: docs-preview-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    name: Bootstrap pai-docs-preview Worker
+    runs-on: ubuntu-latest
+    environment:
+      name: deploy-docs-preview
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Stage placeholder assets
+        run: |
+          mkdir -p ../unified-docs/dist
+          cat > ../unified-docs/dist/index.html <<'EOF'
+          <!doctype html>
+          <title>pai-docs-preview</title>
+          <h1>pai-docs-preview</h1>
+          <p>This is the placeholder root of the Worker. PR previews live at
+          <code>https://&lt;alias&gt;-pai-docs-preview.&lt;subdomain&gt;.workers.dev</code>.</p>
+          EOF
+
+      - name: Bootstrap Worker
+        uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: docs-preview
+          command: deploy

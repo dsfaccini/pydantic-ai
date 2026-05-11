@@ -1,0 +1,201 @@
+name: Docs Preview
+
+# Label-triggered docs preview. Adding `trigger:docs` to a PR builds the
+# pydantic-ai docs via pydantic/unified-docs against the PR's head SHA and
+# deploys to a single Cloudflare Worker (`pai-docs-preview`) as a versioned
+# preview alias. URL is deterministic per commit; Cloudflare auto-prunes the
+# 1000 oldest aliases.
+#
+# The label is always removed at the end so re-adding it re-runs the preview.
+
+on:
+  # zizmor: ignore[dangerous-triggers] -- pull_request_target is required so fork PRs can
+  # access the Cloudflare token. Code execution is gated to PRs whose head SHA was
+  # explicitly opted in by a maintainer adding the `trigger:docs` label.
+  pull_request_target:
+    types: [labeled]
+
+permissions: {}
+
+concurrency:
+  group: docs-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    if: github.event.label.name == 'trigger:docs'
+    runs-on: ubuntu-latest
+    environment:
+      name: deploy-docs-preview
+    permissions:
+      # `pull-requests: write` is needed to post the preview URL comment and
+      # to remove the `trigger:docs` label after the run.
+      pull-requests: write
+
+    steps:
+      - name: Generate app token (for cloning unified-docs)
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3.1.1
+        id: app-token
+        with:
+          app-id: ${{ vars.DOCS_APP_ID }}
+          private-key: ${{ secrets.DOCS_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: unified-docs
+
+      - name: Compute preview alias
+        id: meta
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          sha7=$(echo "$HEAD_SHA" | cut -c1-7)
+          # Alias must start with a letter; "pr<N>-" guarantees that and
+          # adds traceability to a specific PR alongside the commit SHA.
+          alias="pr${PR_NUMBER}-${sha7}"
+          echo "sha7=${sha7}" >> "$GITHUB_OUTPUT"
+          echo "alias=${alias}" >> "$GITHUB_OUTPUT"
+
+      # Layout: $GITHUB_WORKSPACE/{pydantic-ai,unified-docs} as siblings, so
+      # unified-docs's `localPath: '../pydantic-ai'` resolves to the PR checkout
+      # without any symlink trickery.
+      - name: Checkout PR (pydantic-ai)
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: pydantic-ai
+          persist-credentials: false
+
+      - name: Checkout unified-docs
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          repository: pydantic/unified-docs
+          token: ${{ steps.app-token.outputs.token }}
+          path: unified-docs
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@739bfe42ca9233c5e6aca07c1a25a9d34aca49b0 # v6.0.7
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: unified-docs/pnpm-lock.yaml
+
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+        with:
+          python-version: '3.14'
+          enable-cache: true
+          cache-suffix: docs-preview
+          cache-dependency-glob: unified-docs/uv.lock
+
+      - name: Cache unified-docs repo clones
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: unified-docs/.cache
+          key: unified-docs-repos-${{ hashFiles('unified-docs/pnpm-lock.yaml') }}-${{ github.run_id }}
+          restore-keys: |
+            unified-docs-repos-${{ hashFiles('unified-docs/pnpm-lock.yaml') }}-
+
+      - name: pnpm install
+        run: pnpm install --frozen-lockfile
+        working-directory: unified-docs
+
+      - name: uv sync
+        run: uv sync
+        working-directory: unified-docs
+
+      - name: Build unified-docs (pydantic-ai only)
+        env:
+          # Read PR pydantic-ai from sibling instead of cloning from GitHub.
+          USE_LOCAL_COPY: '1'
+          # Requires the pydantic/unified-docs PR adding BUILD_ONLY support;
+          # without that PR this var is ignored and all three libraries are
+          # built — the preview still works, it's just slower.
+          BUILD_ONLY: ai
+        run: pnpm build
+        working-directory: unified-docs
+
+      - name: Deploy preview to Cloudflare Worker
+        id: deploy
+        uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: pydantic-ai/docs-preview
+          # `versions upload` doesn't promote to production; the preview alias
+          # creates a stable URL keyed on PR+SHA. Cloudflare auto-prunes aliases
+          # beyond the 1000 most recent.
+          command: >
+            versions upload
+            --preview-alias=${{ steps.meta.outputs.alias }}
+            --message "PR #${{ github.event.pull_request.number }} @ ${{ steps.meta.outputs.sha7 }}"
+
+      - name: Comment preview URL on PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEPLOY_OUTPUT: ${{ steps.deploy.outputs.command-output }}
+          ALIAS: ${{ steps.meta.outputs.alias }}
+          SHA7: ${{ steps.meta.outputs.sha7 }}
+          SHA_FULL: ${{ github.event.pull_request.head.sha }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          # Extract any *.workers.dev URL from deploy output to discover the
+          # account subdomain, then assemble the preview-alias URL.
+          worker_host=$(grep -oE 'https://[A-Za-z0-9._-]+\.workers\.dev' <<<"$DEPLOY_OUTPUT" | head -1)
+          if [ -z "$worker_host" ]; then
+            echo "Could not find a workers.dev URL in deploy output." >&2
+            echo "$DEPLOY_OUTPUT" >&2
+            exit 1
+          fi
+          subdomain=$(sed -E 's|https://[^.]+\.([^.]+)\.workers\.dev|\1|' <<<"$worker_host")
+          preview_url="https://${ALIAS}-pai-docs-preview.${subdomain}.workers.dev"
+          echo "Preview: ${preview_url}"
+
+          body=$(cat <<EOF
+          ## Docs Preview
+
+          | | |
+          | --- | --- |
+          | **commit** | \`${SHA7}\` |
+          | **preview** | <${preview_url}> |
+
+          <sub>Re-add the \`trigger:docs\` label to rebuild for a newer commit.</sub>
+          EOF
+          )
+
+          existing=$(gh api "repos/${REPO}/issues/${PR}/comments" \
+            --jq '[.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("## Docs Preview")))][0].url // empty')
+          if [ -n "$existing" ]; then
+            gh api -X PATCH "$existing" -f body="$body"
+          else
+            gh api "repos/${REPO}/issues/${PR}/comments" -f body="$body"
+          fi
+
+      - name: Comment failure on PR
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SHA7: ${{ steps.meta.outputs.sha7 }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          body=$(cat <<EOF
+          ## Docs Preview — failed
+
+          The preview build for commit \`${SHA7}\` failed. See [the workflow run](${RUN_URL}) for details.
+
+          <sub>Re-add the \`trigger:docs\` label to retry.</sub>
+          EOF
+          )
+          gh api "repos/${REPO}/issues/${PR}/comments" -f body="$body"
+
+      - name: Remove trigger:docs label
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: gh api -X DELETE "repos/${REPO}/issues/${PR}/labels/trigger:docs" || true
