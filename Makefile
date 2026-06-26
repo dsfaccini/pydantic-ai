@@ -38,7 +38,8 @@ lint: ## Lint the code
 typecheck-pyright:
 	@# To typecheck for a specific version of python, run 'make install-all-python' then set environment variable PYRIGHT_PYTHON=3.10 or similar
 	@# PYRIGHT_PYTHON_IGNORE_WARNINGS avoids the overhead of making a request to github on every invocation
-	PYRIGHT_PYTHON_IGNORE_WARNINGS=1 uv run pyright $(if $(PYRIGHT_PYTHON),--pythonversion $(PYRIGHT_PYTHON))
+	@# pyright-with-limit.sh caps concurrent pyright runs across worktrees (PYRIGHT_CONCURRENCY, default 5; no-op in CI)
+	PYRIGHT_PYTHON_IGNORE_WARNINGS=1 scripts/pyright-with-limit.sh uv run pyright $(if $(PYRIGHT_PYTHON),--pythonversion $(PYRIGHT_PYTHON))
 
 .PHONY: typecheck-mypy
 typecheck-mypy:
