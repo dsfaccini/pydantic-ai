@@ -20,7 +20,7 @@ model {
       loop = subsystem 'Agent loop' {
         description 'Graph nodes orchestrate prompt assembly, model requests, tool and output processing, retries, usage checks, and run finalization.'
         link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/_agent_graph.py 'Source at starting revision'
-        metadata { source_path 'pydantic_ai_slim/pydantic_ai/_agent_graph.py' public_module 'pydantic_graph' }
+        metadata { source_path 'pydantic_ai_slim/pydantic_ai/_agent_graph.py' implementation_module 'pydantic_ai._agent_graph' }
       }
       messages = subsystem 'Normalized messages' {
         description 'Provider-neutral request, response, part, and event shapes used by model adapters, history, and UI protocols.'
