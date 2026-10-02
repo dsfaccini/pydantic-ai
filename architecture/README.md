@@ -4,7 +4,9 @@ This directory contains the LikeC4 source model and static-site toolchain for th
 
 ## Work on the model
 
-Edit the `.c4` files in `model/` to change architecture elements, relationships, and focused views. Keep each view scoped to a question it helps answer, and use `#overview`, `#core`, `#harness`, `#interface`, or `#scenario` for views that belong on the homepage grid.
+Edit the `.c4` files in `model/` to change architecture elements, relationships, and focused views. Keep each view scoped to a question it helps answer. The landing page opens the package map; the navigation menu lists the remaining views.
+
+Keep `landingPage.redirect` enabled to load one diagram on entry. The preview grid retains diagrams as they enter the viewport, increasing browser rendering work as visitors scroll.
 
 Install the pinned LikeC4 dependency with `pnpm install --frozen-lockfile`, then run `pnpm dev` to edit the model with the live viewer. Run `pnpm validate` before building to check the model.
 

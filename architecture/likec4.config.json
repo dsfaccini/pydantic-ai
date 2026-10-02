@@ -3,6 +3,6 @@
   "name": "pydantic-ai-architecture",
   "title": "Pydantic AI Architecture",
   "landingPage": {
-    "include": ["#overview", "#core", "#harness", "#interface", "#scenario"]
+    "redirect": true
   }
 }
