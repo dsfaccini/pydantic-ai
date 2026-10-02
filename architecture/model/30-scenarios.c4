@@ -48,7 +48,7 @@ views {
   view provider_native_tools {
     #scenario, #interface
     title 'Provider-native tool execution'
-    description 'Provider-native tools are declared through the model adapter and execute on the provider side. This view shows the configured request boundary; it does not imply a local function-tool call.'
+    description 'Provider-native tools are configured by the application through capabilities and translated by model adapters into provider requests and execute on the provider side. This view shows the configured request boundary; it does not imply a local function-tool call.'
     link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/docs/native-tools.md 'Native tool documentation at starting revision'
     link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/native_tools/__init__.py 'Native tool definitions at starting revision'
 

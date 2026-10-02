@@ -17,3 +17,5 @@ To update the architecture snapshot after bringing this worktree up to date with
 ## Deploy
 
 `pnpm deploy` rebuilds the viewer and deploys the static assets with the Wrangler CLI available in the local development environment. Cloudflare serves the generated viewer at the Worker root and falls back to `index.html` for client-side routes.
+
+Deployment tooling was verified with local Wrangler 4.147.0; the scripts use the Wrangler installation available on PATH.
