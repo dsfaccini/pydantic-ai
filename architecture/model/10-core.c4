@@ -235,7 +235,7 @@ model {
   repo.slim.toolsets -[depends_on]-> repo.slim.mcp 'uses MCP client transports'
   repo.slim.mcp -[depends_on]-> repo.slim.messages 'maps protocol content to normalized parts'
   repo.slim.ui -[depends_on]-> repo.slim.messages 'translates normalized messages and events'
-  repo.slim.native_tools -[depends_on]-> repo.slim.models 'maps native tools through model adapters'
+  repo.slim.models -[depends_on]-> repo.slim.native_tools 'uses native-tool declarations'
   repo.slim.telemetry -[emits]-> externals.collector 'exports when telemetry is configured'
   repo.slim.workspaces -[reads_writes]-> externals.filesystem 'uses a configured backend'
   repo.slim.workspaces -[executes]-> externals.command 'when command support is configured'
