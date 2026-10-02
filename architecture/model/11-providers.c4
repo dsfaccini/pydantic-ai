@@ -1,0 +1,392 @@
+model {
+  extend externals {
+    c_openai_sdk = library 'OpenAI Python SDK' {
+      description 'Client library used by OpenAI and the OpenAI-compatible provider adapters. A compatible endpoint is selected through provider configuration; use does not imply an OpenAI account.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/_openai_compatible.py 'Client integration source'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/_openai_compatible.py' public_module 'openai.AsyncOpenAI' }
+    }
+    c_anthropic_sdk = library 'Anthropic Python SDK' {
+      description 'Anthropic client library used by Anthropic model and provider adapters.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/anthropic.py 'Client integration source'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/anthropic.py' public_module 'anthropic.AsyncAnthropic' }
+    }
+    c_boto_sdk = library 'AWS SDK for Python' {
+      description 'Botocore client used when the application configures Amazon Bedrock Runtime.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/bedrock.py 'Client integration source'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/bedrock.py' public_module 'botocore.client.BaseClient' }
+    }
+    c_cohere_sdk = library 'Cohere Python SDK' {
+      description 'Cohere SDK client used by the Cohere model provider and embedding adapter.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/cohere.py 'Client integration source'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/cohere.py' public_module 'cohere.AsyncClientV2' }
+    }
+    c_google_genai_sdk = library 'Google Gen AI SDK' {
+      description 'Google Gen AI client library used for Gemini API and Google Cloud model requests.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/google.py 'Client integration source'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/google.py' public_module 'google.genai.Client' }
+    }
+    c_groq_sdk = library 'Groq Python SDK' {
+      description 'Groq SDK client used by the Groq model adapter.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/groq.py 'Client integration source'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/groq.py' public_module 'groq.AsyncGroq' }
+    }
+    c_huggingface_sdk = library 'Hugging Face Hub SDK' {
+      description 'Inference client library used to reach configured Hugging Face inference providers and endpoints.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/huggingface.py 'Client integration source'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/huggingface.py' public_module 'huggingface_hub.AsyncInferenceClient' }
+    }
+    c_mistral_sdk = library 'Mistral Python SDK' {
+      description 'Mistral client library used by the Mistral model adapter.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/mistral.py 'Client integration source'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/mistral.py' public_module 'mistralai.Mistral' }
+    }
+    c_typesafe_sdk = library 'TypeSafe Python SDK' {
+      description 'TypeSafe client library used to access the Jev model API.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/typesafe.py 'Client integration source'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/typesafe.py' public_module 'typesafe_sdk.AsyncTypeSafeClient' }
+    }
+    c_voyageai_sdk = library 'Voyage AI Python SDK' {
+      description 'Voyage AI client library used by the Voyage AI model and embedding adapters.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/voyageai.py 'Client integration source'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/voyageai.py' public_module 'voyageai.AsyncClient' }
+    }
+    c_xai_sdk = library 'xAI Python SDK' {
+      description 'Native xAI SDK used by xAI model-provider and realtime integrations.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/xai.py 'Client integration source'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/xai.py' public_module 'xai_sdk.AsyncClient' }
+    }
+    c_sentence_transformers = library 'Sentence Transformers' {
+      description 'Optional local embedding library; it runs in the application environment and does not require a remote model service.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/embeddings/sentence_transformers.py 'Embedding integration source'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/embeddings/sentence_transformers.py' public_module 'pydantic_ai.embeddings.sentence_transformers' }
+    }
+    c_temporal_sdk = library 'Temporal Python SDK' {
+      description 'Temporal workflow and activity client library used by the opt-in TemporalDurability capability.'
+      link https://github.com/pydantic/pydantic-ai/tree/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/durable_exec/temporal 'Durability integration source'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/durable_exec/temporal/' public_module 'temporalio' }
+    }
+    c_dbos_sdk = library 'DBOS Python SDK' {
+      description 'DBOS workflow runtime library used by the opt-in DBOSDurability capability.'
+      link https://github.com/pydantic/pydantic-ai/tree/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/durable_exec/dbos 'Durability integration source'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/durable_exec/dbos/' public_module 'dbos' }
+    }
+    c_prefect_sdk = library 'Prefect Python SDK' {
+      description 'Prefect workflow runtime library used by the opt-in PrefectDurability capability.'
+      link https://github.com/pydantic/pydantic-ai/tree/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/durable_exec/prefect 'Durability integration source'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/durable_exec/prefect/' public_module 'prefect' }
+    }
+    c_httpx2 = library 'HTTPX 2 client' {
+      description 'Async HTTP client used by provider integrations that implement their protocol directly or perform OAuth requests.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/system_one.py 'Direct HTTP provider source'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/system_one.py' public_module 'httpx2.AsyncClient' }
+    }
+    c_fastmcp_sdk = library 'FastMCP client SDK' {
+      description 'Optional MCP client transport library used by MCP toolsets for in-process, stdio, and HTTP connections.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/mcp.py 'MCP client integration source'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/mcp.py' public_module 'fastmcp.client.Client' }
+    }
+
+    c_anthropic_api = service 'Anthropic API' {
+      description 'Anthropic Messages API used by the native Anthropic model adapter.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/anthropic.py 'Provider endpoint configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/anthropic.py' public_module 'pydantic_ai.providers.anthropic.AnthropicProvider' }
+    }
+    c_bedrock_runtime_api = service 'Amazon Bedrock Runtime' {
+      description 'AWS Bedrock Runtime Converse and invoke APIs, available when the application supplies AWS credentials and configures the provider.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/bedrock.py 'Provider endpoint configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/bedrock.py' public_module 'pydantic_ai.providers.bedrock.BedrockProvider' }
+    }
+    c_bedrock_mantle_api = service 'Amazon Bedrock Mantle' {
+      description 'Bedrock-hosted OpenAI-compatible chat and responses endpoints, selected through the Bedrock Mantle provider.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/bedrock_mantle.py 'Provider endpoint configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/bedrock_mantle.py' public_module 'pydantic_ai.providers.bedrock_mantle.BedrockMantleProvider' }
+    }
+    c_cohere_api = service 'Cohere API' {
+      description 'Cohere chat and embed endpoints used by the native Cohere model and embedding adapters.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/cohere.py 'Provider endpoint configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/cohere.py' public_module 'pydantic_ai.providers.cohere.CohereProvider' }
+    }
+    c_gemini_api = service 'Gemini API' {
+      description 'Google Gemini API used by the Google provider for model and embedding requests.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/google.py 'Provider endpoint configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/google.py' public_module 'pydantic_ai.providers.google.GoogleProvider' }
+    }
+    c_vertex_ai = service 'Vertex AI' {
+      description 'Google Cloud Vertex AI model endpoints reached through the Google Gen AI SDK and configured cloud credentials.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/google_cloud.py 'Provider endpoint configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/google_cloud.py' public_module 'pydantic_ai.providers.google_cloud.GoogleCloudProvider' }
+    }
+    c_groq_api = service 'Groq API' {
+      description 'Groq inference API used by the Groq SDK-backed model adapter.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/groq.py 'Provider endpoint configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/groq.py' public_module 'pydantic_ai.providers.groq.GroqProvider' }
+    }
+    c_huggingface_inference = service 'Hugging Face Inference APIs' {
+      description 'Configured Hugging Face inference endpoints or routed inference providers; the selected model and endpoint depend on application settings.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/huggingface.py 'Provider endpoint configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/huggingface.py' public_module 'pydantic_ai.providers.huggingface.HuggingFaceProvider' }
+    }
+    c_mistral_api = service 'Mistral API' {
+      description 'Mistral API used by the native Mistral client and model adapter.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/mistral.py 'Provider endpoint configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/mistral.py' public_module 'pydantic_ai.providers.mistral.MistralProvider' }
+    }
+    c_typesafe_api = service 'TypeSafe API' {
+      description 'TypeSafe API serving Jev models through its SDK client.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/typesafe.py 'Provider endpoint configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/typesafe.py' public_module 'pydantic_ai.providers.typesafe.TypeSafeProvider' }
+    }
+    c_voyageai_api = service 'Voyage AI API' {
+      description 'Voyage AI model and embedding endpoints accessed through the Voyage AI SDK.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/voyageai.py 'Provider endpoint configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/voyageai.py' public_module 'pydantic_ai.providers.voyageai.VoyageAIProvider' }
+    }
+    c_xai_api = service 'xAI API' {
+      description 'xAI model API used by native xAI model and realtime adapters.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/xai.py 'Provider endpoint configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/xai.py' public_module 'pydantic_ai.providers.xai.XaiProvider' }
+    }
+    c_system_one_api = service 'System One API' {
+      description 'A configurable System One decisions endpoint speaking the provider-specific /v1/systemone protocol.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/system_one.py 'Provider endpoint configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/system_one.py' public_module 'pydantic_ai.providers.system_one.SystemOneProvider' }
+    }
+    c_pydantic_gateway = service 'Pydantic AI Gateway' {
+      description 'An optional hosted gateway that routes configured upstream model-provider requests. Applications choose its route and base URL.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/gateway.py 'Gateway provider integration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/gateway.py' public_module 'pydantic_ai.providers.gateway.gateway_provider' }
+    }
+    c_openai_codex_api = service 'OpenAI Codex API' {
+      description 'The Codex model endpoint selected by the OpenAI Codex provider and OAuth credential flow.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/openai_codex.py 'Codex provider and OAuth flow'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/openai_codex.py' public_module 'pydantic_ai.providers.openai_codex.OpenAICodexProvider' }
+    }
+    c_openai_oauth = service 'OpenAI OAuth services' {
+      description 'OpenAI authorization and token endpoints used by the Codex PKCE sign-in and token-refresh flow.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/openai_codex.py 'Codex OAuth flow'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/openai_codex.py' public_module 'pydantic_ai.providers.openai_codex.OpenAICodexOAuthFlow' }
+    }
+    c_github_copilot_api = service 'GitHub Copilot API' {
+      description 'GitHub Copilot model gateway selected through the Copilot provider and its OAuth credential flow.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/github_copilot.py 'Copilot provider configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/github_copilot.py' public_module 'pydantic_ai.providers.github_copilot.GitHubCopilotProvider' }
+    }
+    c_github_oauth = service 'GitHub OAuth service' {
+      description 'GitHub device authorization and access-token endpoints used to obtain Copilot credentials.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/_github_copilot_oauth.py 'Copilot OAuth implementation'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/_github_copilot_oauth.py' public_module 'pydantic_ai.providers.github_copilot.GitHubCopilotProvider' }
+    }
+
+    c_alibaba_dashscope = service 'Alibaba Cloud Model Studio (DashScope)' {
+      description 'OpenAI-compatible DashScope endpoint selected through AlibabaProvider.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/alibaba.py 'Provider configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/alibaba.py' public_module 'pydantic_ai.providers.alibaba.AlibabaProvider' }
+    }
+    c_azure_openai = service 'Azure OpenAI' {
+      description 'Azure-hosted OpenAI-compatible model and realtime endpoints selected by AzureProvider configuration.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/azure.py 'Provider configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/azure.py' public_module 'pydantic_ai.providers.azure.AzureProvider' }
+    }
+    c_cerebras_api = service 'Cerebras API' {
+      description 'Cerebras inference endpoint exposed through the OpenAI-compatible API.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/cerebras.py 'Provider configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/cerebras.py' public_module 'pydantic_ai.providers.cerebras.CerebrasProvider' }
+    }
+    c_crusoe_api = service 'Crusoe Serverless Inference' {
+      description 'Crusoe inference endpoint with an OpenAI-compatible API surface.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/crusoe.py 'Provider configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/crusoe.py' public_module 'pydantic_ai.providers.crusoe.CrusoeProvider' }
+    }
+    c_deepseek_api = service 'DeepSeek API' {
+      description 'DeepSeek model endpoint selected through its OpenAI-compatible provider.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/deepseek.py 'Provider configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/deepseek.py' public_module 'pydantic_ai.providers.deepseek.DeepSeekProvider' }
+    }
+    c_fireworks_api = service 'Fireworks AI API' {
+      description 'Fireworks inference endpoint selected through the OpenAI-compatible provider.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/fireworks.py 'Provider configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/fireworks.py' public_module 'pydantic_ai.providers.fireworks.FireworksProvider' }
+    }
+    c_heroku_api = service 'Heroku AI' {
+      description 'Heroku model-inference endpoint with an OpenAI-compatible request interface.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/heroku.py 'Provider configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/heroku.py' public_module 'pydantic_ai.providers.heroku.HerokuProvider' }
+    }
+    c_litellm_proxy = service 'LiteLLM proxy' {
+      description 'A configured LiteLLM proxy endpoint using the OpenAI-compatible API surface.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/litellm.py 'Provider configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/litellm.py' public_module 'pydantic_ai.providers.litellm.LiteLLMProvider' }
+    }
+    c_moonshotai_api = service 'Moonshot AI API' {
+      description 'Moonshot AI Kimi model endpoint selected through its OpenAI-compatible provider.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/moonshotai.py 'Provider configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/moonshotai.py' public_module 'pydantic_ai.providers.moonshotai.MoonshotAIProvider' }
+    }
+    c_nebius_api = service 'Nebius AI Studio' {
+      description 'Nebius model endpoint selected through its OpenAI-compatible provider.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/nebius.py 'Provider configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/nebius.py' public_module 'pydantic_ai.providers.nebius.NebiusProvider' }
+    }
+    c_ollama_api = service 'Ollama API' {
+      description 'A local or remote Ollama endpoint configured with the OpenAI-compatible API.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/ollama.py 'Provider configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/ollama.py' public_module 'pydantic_ai.providers.ollama.OllamaProvider' }
+    }
+    c_openai_api = service 'OpenAI API' {
+      description 'OpenAI chat-completions, responses, embeddings, and realtime endpoints selected by the OpenAI provider.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/openai.py 'Provider configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/openai.py' public_module 'pydantic_ai.providers.openai.OpenAIProvider' }
+    }
+    c_openrouter_api = service 'OpenRouter API' {
+      description 'OpenRouter model-routing endpoint using the OpenAI-compatible API and configured downstream model.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/openrouter.py 'Provider configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/openrouter.py' public_module 'pydantic_ai.providers.openrouter.OpenRouterProvider' }
+    }
+    c_ovhcloud_api = service 'OVHcloud AI Endpoints' {
+      description 'OVHcloud hosted model endpoint with an OpenAI-compatible request surface.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/ovhcloud.py 'Provider configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/ovhcloud.py' public_module 'pydantic_ai.providers.ovhcloud.OVHcloudProvider' }
+    }
+    c_sambanova_api = service 'SambaNova API' {
+      description 'SambaNova inference endpoint exposed through an OpenAI-compatible API.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/sambanova.py 'Provider configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/sambanova.py' public_module 'pydantic_ai.providers.sambanova.SambaNovaProvider' }
+    }
+    c_snowflake_api = service 'Snowflake Cortex AI' {
+      description 'Snowflake-hosted model endpoint configured through the OpenAI-compatible provider.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/snowflake.py 'Provider configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/snowflake.py' public_module 'pydantic_ai.providers.snowflake.SnowflakeProvider' }
+    }
+    c_together_api = service 'Together AI API' {
+      description 'Together inference endpoint selected through the OpenAI-compatible provider.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/together.py 'Provider configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/together.py' public_module 'pydantic_ai.providers.together.TogetherProvider' }
+    }
+    c_vercel_ai_gateway = service 'Vercel AI Gateway' {
+      description 'Vercel AI Gateway endpoint configured through the OpenAI-compatible provider.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/vercel.py 'Provider configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/vercel.py' public_module 'pydantic_ai.providers.vercel.VercelProvider' }
+    }
+    c_vllm_api = service 'vLLM server' {
+      description 'A local or remote vLLM server exposing the OpenAI-compatible API.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/vllm.py 'Provider configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/vllm.py' public_module 'pydantic_ai.providers.vllm.VLLMProvider' }
+    }
+    c_zai_api = service 'Z.AI API' {
+      description 'Z.AI model endpoint selected through its OpenAI-compatible provider.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers/zai.py 'Provider configuration'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/zai.py' public_module 'pydantic_ai.providers.zai.ZaiProvider' }
+    }
+  }
+
+  repo.slim.providers -[depends_on]-> externals.c_openai_sdk 'OpenAI and OpenAI-compatible client'
+  repo.slim.models -[depends_on]-> externals.c_openai_sdk 'OpenAI chat, responses, embeddings, and realtime adapters'
+  repo.slim.providers -[depends_on]-> externals.c_anthropic_sdk 'Anthropic client'
+  repo.slim.providers -[depends_on]-> externals.c_boto_sdk 'Bedrock Runtime client'
+  repo.slim.providers -[depends_on]-> externals.c_cohere_sdk 'Cohere client'
+  repo.slim.providers -[depends_on]-> externals.c_google_genai_sdk 'Gemini and Vertex client'
+  repo.slim.providers -[depends_on]-> externals.c_groq_sdk 'Groq client'
+  repo.slim.providers -[depends_on]-> externals.c_huggingface_sdk 'Hugging Face inference client'
+  repo.slim.providers -[depends_on]-> externals.c_mistral_sdk 'Mistral client'
+  repo.slim.providers -[depends_on]-> externals.c_typesafe_sdk 'TypeSafe client'
+  repo.slim.providers -[depends_on]-> externals.c_voyageai_sdk 'Voyage AI client'
+  repo.slim.providers -[depends_on]-> externals.c_xai_sdk 'xAI client'
+  repo.slim.providers -[depends_on]-> externals.c_sentence_transformers 'local embedding implementation'
+  repo.slim.providers -[depends_on]-> externals.c_httpx2 'provider-specific HTTP and OAuth requests'
+  repo.slim.mcp -[depends_on]-> externals.c_fastmcp_sdk 'MCP client and transports'
+
+  externals.c_anthropic_sdk -[network]-> externals.c_anthropic_api 'Anthropic API requests'
+  externals.c_anthropic_sdk -[network]-> externals.c_bedrock_runtime_api 'when Anthropic models are routed through Bedrock'
+  externals.c_boto_sdk -[network]-> externals.c_bedrock_runtime_api 'Bedrock Runtime requests'
+  externals.c_openai_sdk -[network]-> externals.c_bedrock_mantle_api 'configured Bedrock Mantle endpoint'
+  externals.c_cohere_sdk -[network]-> externals.c_cohere_api 'Cohere API requests'
+  externals.c_google_genai_sdk -[network]-> externals.c_gemini_api 'Gemini API requests'
+  externals.c_google_genai_sdk -[network]-> externals.c_vertex_ai 'Vertex AI requests'
+  externals.c_groq_sdk -[network]-> externals.c_groq_api 'Groq API requests'
+  externals.c_huggingface_sdk -[network]-> externals.c_huggingface_inference 'configured inference requests'
+  externals.c_mistral_sdk -[network]-> externals.c_mistral_api 'Mistral API requests'
+  externals.c_typesafe_sdk -[network]-> externals.c_typesafe_api 'TypeSafe API requests'
+  externals.c_voyageai_sdk -[network]-> externals.c_voyageai_api 'Voyage AI API requests'
+  externals.c_xai_sdk -[network]-> externals.c_xai_api 'xAI API requests'
+  externals.c_httpx2 -[network]-> externals.c_system_one_api 'configured System One requests'
+  externals.c_httpx2 -[network]-> externals.c_pydantic_gateway 'configured gateway route'
+  externals.c_httpx2 -[network]-> externals.c_openai_oauth 'Codex authorization and token refresh'
+  externals.c_httpx2 -[network]-> externals.c_github_oauth 'Copilot device authorization and token requests'
+  externals.c_openai_sdk -[network]-> externals.c_openai_codex_api 'Codex model requests'
+  externals.c_temporal_sdk -[network]-> externals.temporal_service 'when TemporalDurability is configured'
+  externals.c_dbos_sdk -[reads_writes]-> externals.dbos_database 'when DBOSDurability is configured'
+  externals.c_prefect_sdk -[network]-> externals.prefect_service 'when PrefectDurability is configured'
+  externals.c_fastmcp_sdk -[network]-> externals.mcp_http 'when HTTP transport is configured'
+  externals.c_fastmcp_sdk -[executes]-> externals.mcp_stdio 'when stdio transport is configured'
+  externals.c_fastmcp_sdk -[calls]-> externals.mcp_inprocess 'when an in-process server is configured'
+
+  externals.c_openai_sdk -[network]-> externals.c_alibaba_dashscope 'configured DashScope requests'
+  externals.c_openai_sdk -[network]-> externals.c_azure_openai 'configured Azure requests'
+  externals.c_openai_sdk -[network]-> externals.c_cerebras_api 'configured Cerebras requests'
+  externals.c_openai_sdk -[network]-> externals.c_crusoe_api 'configured Crusoe requests'
+  externals.c_openai_sdk -[network]-> externals.c_deepseek_api 'configured DeepSeek requests'
+  externals.c_openai_sdk -[network]-> externals.c_fireworks_api 'configured Fireworks requests'
+  externals.c_openai_sdk -[network]-> externals.c_github_copilot_api 'configured Copilot requests'
+  externals.c_openai_sdk -[network]-> externals.c_heroku_api 'configured Heroku requests'
+  externals.c_openai_sdk -[network]-> externals.c_litellm_proxy 'configured proxy requests'
+  externals.c_openai_sdk -[network]-> externals.c_moonshotai_api 'configured Moonshot requests'
+  externals.c_openai_sdk -[network]-> externals.c_nebius_api 'configured Nebius requests'
+  externals.c_openai_sdk -[network]-> externals.c_ollama_api 'configured local or remote Ollama requests'
+  externals.c_openai_sdk -[network]-> externals.c_openai_api 'OpenAI API requests'
+  externals.c_openai_sdk -[network]-> externals.c_openrouter_api 'configured OpenRouter requests'
+  externals.c_openai_sdk -[network]-> externals.c_ovhcloud_api 'configured OVHcloud requests'
+  externals.c_openai_sdk -[network]-> externals.c_sambanova_api 'configured SambaNova requests'
+  externals.c_openai_sdk -[network]-> externals.c_snowflake_api 'configured Snowflake requests'
+  externals.c_openai_sdk -[network]-> externals.c_together_api 'configured Together requests'
+  externals.c_openai_sdk -[network]-> externals.c_vercel_ai_gateway 'configured Vercel gateway requests'
+  externals.c_openai_sdk -[network]-> externals.c_vllm_api 'configured local or remote vLLM requests'
+  externals.c_openai_sdk -[network]-> externals.c_zai_api 'configured Z.AI requests'
+
+  repo.slim.embeddings -[network]-> externals.c_cohere_api 'when Cohere embeddings are selected'
+  repo.slim.embeddings -[network]-> externals.c_bedrock_runtime_api 'when Bedrock embeddings are selected'
+  repo.slim.embeddings -[network]-> externals.c_gemini_api 'when Gemini embeddings are selected'
+  repo.slim.embeddings -[network]-> externals.c_openai_api 'when OpenAI embeddings are selected'
+  repo.slim.embeddings -[network]-> externals.c_voyageai_api 'when Voyage AI embeddings are selected'
+  repo.slim.embeddings -[calls]-> externals.c_sentence_transformers 'when local embeddings are selected'
+  repo.slim.realtime -[network]-> externals.c_openai_api 'when OpenAI realtime is selected'
+  repo.slim.realtime -[network]-> externals.c_azure_openai 'when Azure realtime is selected'
+  repo.slim.realtime -[network]-> externals.c_gemini_api 'when Google realtime is selected'
+  repo.slim.realtime -[network]-> externals.c_xai_api 'when xAI realtime is selected'
+}
+
+views {
+    view provider_request_boundary {
+      #interface
+      title 'Provider request boundary'
+      description 'One example of the request path: core model adapter to a configured provider client and remote API. Provider configuration selects the service and client; interface scenarios are user-selected configurations, not deployments with every integration active.'
+      include repo.slim.models, repo.slim.providers, repo.slim.profiles, externals.c_openai_sdk, externals.c_openai_api, externals.c_anthropic_sdk, externals.c_anthropic_api
+    }
+
+    view native_provider_integrations {
+      #interface
+      title 'Native provider integrations'
+      description 'Provider families backed by their native SDK or a provider-specific HTTP protocol. Installing a provider extra and choosing its provider are application decisions.'
+      include repo.slim.providers, repo.slim.models, externals.c_anthropic_sdk, externals.c_anthropic_api, externals.c_boto_sdk, externals.c_bedrock_runtime_api, externals.c_cohere_sdk, externals.c_cohere_api, externals.c_google_genai_sdk, externals.c_gemini_api, externals.c_vertex_ai, externals.c_groq_sdk, externals.c_groq_api, externals.c_huggingface_sdk, externals.c_huggingface_inference, externals.c_mistral_sdk, externals.c_mistral_api, externals.c_typesafe_sdk, externals.c_typesafe_api, externals.c_voyageai_sdk, externals.c_voyageai_api, externals.c_xai_sdk, externals.c_xai_api, externals.c_system_one_api, externals.c_pydantic_gateway, externals.c_openai_codex_api, externals.c_openai_oauth, externals.c_github_oauth
+    }
+
+    view openai_compatible_integrations {
+      #interface
+      title 'OpenAI-compatible endpoints'
+      description 'These endpoint families share the OpenAI Python client contract, while each provider configures its own base URL, authentication, and model profile. The OpenAI SDK is a client dependency, not the remote service.'
+      include repo.slim.providers, repo.slim.models, externals.c_openai_sdk, externals.c_alibaba_dashscope, externals.c_azure_openai, externals.c_bedrock_mantle_api, externals.c_cerebras_api, externals.c_crusoe_api, externals.c_deepseek_api, externals.c_fireworks_api, externals.c_github_copilot_api, externals.c_heroku_api, externals.c_litellm_proxy, externals.c_moonshotai_api, externals.c_nebius_api, externals.c_ollama_api, externals.c_openai_api, externals.c_openrouter_api, externals.c_ovhcloud_api, externals.c_sambanova_api, externals.c_snowflake_api, externals.c_together_api, externals.c_vercel_ai_gateway, externals.c_vllm_api, externals.c_zai_api
+    }
+
+    view embedding_integrations {
+      #interface
+      title 'Embedding integrations'
+      description 'The embedding interface supports optional remote provider APIs and a local Sentence Transformers implementation; applications select and install only the backend they need.'
+      include repo.slim.embeddings, externals.c_openai_sdk, externals.c_openai_api, externals.c_cohere_sdk, externals.c_cohere_api, externals.c_google_genai_sdk, externals.c_gemini_api, externals.c_boto_sdk, externals.c_bedrock_runtime_api, externals.c_voyageai_sdk, externals.c_voyageai_api, externals.c_sentence_transformers
+    }
+
+    view realtime_integrations {
+      #interface
+      title 'Realtime integrations'
+      description 'Realtime sessions are opt-in adapters for selected provider protocols. OpenAI, Azure, Google, and xAI paths are configurable and are not requirements for ordinary Agent runs.'
+      include repo.slim.realtime, externals.c_openai_sdk, externals.c_openai_api, externals.c_azure_openai, externals.c_google_genai_sdk, externals.c_gemini_api, externals.c_xai_sdk, externals.c_xai_api
+    }
+}

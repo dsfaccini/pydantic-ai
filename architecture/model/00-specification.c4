@@ -1,0 +1,72 @@
+specification {
+  color internal_blue #2563EB
+  color capability_teal #0D9488
+  color service_purple #7C3AED
+
+  element repository {
+    style { color internal_blue }
+  }
+  element package {
+    style { color internal_blue }
+  }
+  element subsystem {
+    style { color capability_teal }
+  }
+  element capability {
+    style { color capability_teal }
+  }
+  element library {
+    style { color amber }
+  }
+  element service {
+    style { color service_purple }
+  }
+  element process {
+    style { shape component }
+  }
+  element storage {
+    style { shape cylinder }
+  }
+  element actor {
+    style { shape person }
+  }
+
+  relationship depends_on {
+    title 'depends on'
+    description 'A code or package dependency recorded by an import or package manifest.'
+  }
+  relationship calls {
+    title 'calls'
+    description 'An in-process call between framework components or through an SDK interface.'
+  }
+  relationship network {
+    title 'network'
+    description 'A network protocol boundary. Its presence describes a possible configured interaction, not a required deployment.'
+  }
+  relationship executes {
+    title 'executes'
+    description 'Starts or runs work in a process or execution engine.'
+  }
+  relationship reads_writes {
+    title 'reads / writes'
+    description 'Reads or writes data through a storage interface.'
+  }
+  relationship extends_ {
+    title 'extends'
+    description 'Adds model-family behavior or a specialized implementation to a base abstraction.'
+  }
+  relationship emits {
+    title 'emits'
+    description 'Sends events or telemetry to a consumer or collector.'
+  }
+  relationship configures {
+    title 'configures'
+    description 'Selects, configures, or supplies a capability to another component.'
+  }
+
+  tag overview
+  tag core
+  tag harness
+  tag interface
+  tag scenario
+}

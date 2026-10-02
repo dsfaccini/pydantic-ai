@@ -1,0 +1,22 @@
+{
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "11.21.0",
+      "onFail": "download"
+    }
+  },
+  "type": "module",
+  "name": "pydantic-ai-architecture",
+  "private": true,
+  "scripts": {
+    "dev": "likec4 dev",
+    "validate": "likec4 validate",
+    "build": "likec4 build --base / --output ./dist",
+    "preview": "wrangler dev",
+    "deploy": "pnpm build && wrangler deploy"
+  },
+  "devDependencies": {
+    "likec4": "1.59.4"
+  }
+}

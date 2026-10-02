@@ -1,0 +1,217 @@
+views {
+  dynamic view basic_model_request {
+    #scenario, #interface
+    title 'Basic model request'
+    description 'One configured run through an OpenAI model adapter. The application chooses the model and provider; other provider paths are separate configurations.'
+    link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/_agent_graph.py 'Agent graph source at starting revision'
+    link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/models/openai.py 'OpenAI model adapter at starting revision'
+
+    externals.application -> repo.slim.agent 'calls Agent.run'
+    repo.slim.agent -> repo.slim.loop 'enters the agent graph'
+    repo.slim.loop -> repo.slim.messages 'prepares normalized request messages'
+    repo.slim.loop -> repo.slim.models 'calls Model.request'
+    repo.slim.models -> externals.c_openai_sdk 'uses the configured OpenAI client'
+    externals.c_openai_sdk -> externals.c_openai_api 'sends the model request'
+    externals.c_openai_api -> externals.c_openai_sdk 'returns the model response'
+    externals.c_openai_sdk -> repo.slim.models 'decodes the provider response'
+    repo.slim.models -> repo.slim.loop 'returns the normalized response'
+    repo.slim.loop -> repo.slim.agent 'returns the run result'
+
+    include repo.slim.providers, repo.slim.profiles
+  }
+
+  dynamic view local_function_tool {
+    #scenario, #interface
+    title 'Local function-tool execution'
+    description 'A function tool runs in the application process after the model returns its call. The agent loop executes the tool and may send the result in a later model request.'
+    link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/_agent_graph.py 'Agent graph source at starting revision'
+    link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/_tool_execution.py 'Function-tool execution at starting revision'
+
+    externals.application -> repo.slim.agent 'calls Agent.run'
+    repo.slim.agent -> repo.slim.loop 'enters the agent graph'
+    repo.slim.loop -> repo.slim.models 'requests a model response'
+    repo.slim.models -> externals.c_openai_sdk 'uses the configured OpenAI client'
+    externals.c_openai_sdk -> externals.c_openai_api 'sends the request with function-tool definitions'
+    externals.c_openai_api -> externals.c_openai_sdk 'returns a function-tool call'
+    externals.c_openai_sdk -> repo.slim.models 'decodes the provider response'
+    repo.slim.models -> repo.slim.loop 'returns the normalized tool call'
+    repo.slim.loop -> repo.slim.toolsets 'dispatches the tool call'
+    repo.slim.toolsets -> repo.slim.tools 'validates and invokes the function tool'
+    repo.slim.tools -> externals.application 'runs the configured Python function'
+    externals.application -> repo.slim.tools 'returns the function result'
+    repo.slim.tools -> repo.slim.loop 'returns the tool result'
+    repo.slim.loop -> repo.slim.models 'may send the tool result in a later request'
+
+    include repo.slim.providers, repo.slim.profiles
+  }
+
+  view provider_native_tools {
+    #scenario, #interface
+    title 'Provider-native tool execution'
+    description 'Provider-native tools are declared through the model adapter and execute on the provider side. This view shows the configured request boundary; it does not imply a local function-tool call.'
+    link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/docs/native-tools.md 'Native tool documentation at starting revision'
+    link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/native_tools/__init__.py 'Native tool definitions at starting revision'
+
+    include repo.slim.agent, repo.slim.loop, repo.slim.messages, repo.slim.models, repo.slim.providers, repo.slim.native_tools, externals.c_openai_sdk, externals.c_openai_api
+  }
+
+  dynamic view local_shell_filesystem {
+    #scenario, #interface
+    title 'Shell and FileSystem with LocalWorkspace'
+    description 'The application combines the harness Shell and FileSystem capabilities with core LocalWorkspace. Commands and files use the configured host workspace. LocalWorkspace provides no process isolation; Shell command filters are command guardrails, not a sandbox.'
+    link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/capabilities/local_workspace.py 'LocalWorkspace source at starting revision'
+    link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/shell/_capability.py 'Shell capability at starting revision'
+    link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/filesystem/_capability.py 'FileSystem capability at starting revision'
+
+    externals.application -> repo.slim.agent 'configures Shell, FileSystem, and LocalWorkspace'
+    repo.slim.agent -> repo.slim.loop 'runs the configured agent'
+    repo.slim.loop -> repo.harness.coding.shell 'calls the shell tool'
+    repo.slim.loop -> repo.harness.coding.filesystem 'calls filesystem tools'
+    repo.harness.coding.shell -> repo.slim.workspaces 'runs commands through ctx.workspace'
+    repo.harness.coding.filesystem -> repo.slim.workspaces 'reads and writes through ctx.workspace'
+    repo.slim.workspaces -> externals.command 'uses the local command backend'
+    repo.slim.workspaces -> externals.filesystem 'uses the local filesystem backend'
+  }
+
+  view shell_e2b_workspace {
+    #scenario, #interface
+    title 'Shell with an E2B workspace'
+    description 'One remote configuration combines the harness Shell capability with E2BSandbox as the run workspace. E2B creates or attaches to the sandbox when the workspace is first used; this is a distinct configuration from Modal and Sprites.'
+    link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/e2b_sandbox/_capability.py 'E2BSandbox source at starting revision'
+    link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/shell/_capability.py 'Shell capability at starting revision'
+
+    include externals.application, repo.slim.agent, repo.slim.loop, repo.slim.workspaces, repo.harness.coding.shell, repo.harness.execution.e2b_sandbox, externals.h_e2b_sdk, externals.h_e2b_service, externals.command, externals.filesystem
+  }
+
+  view shell_modal_workspace {
+    #scenario, #interface
+    title 'Shell with a Modal workspace'
+    description 'One remote configuration combines the harness Shell capability with ModalSandbox as the run workspace. This is an alternative configuration to E2B and Sprites.'
+    link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/modal_sandbox/_capability.py 'ModalSandbox source at starting revision'
+    link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/shell/_capability.py 'Shell capability at starting revision'
+
+    include externals.application, repo.slim.agent, repo.slim.loop, repo.slim.workspaces, repo.harness.coding.shell, repo.harness.execution.modal_sandbox, externals.h_modal_sdk, externals.h_modal_service, externals.command, externals.filesystem
+  }
+
+  view shell_sprites_workspace {
+    #scenario, #interface
+    title 'Shell with a Sprites workspace'
+    description 'One remote configuration combines the harness Shell capability with SpritesSandbox as the run workspace. This is an alternative configuration to E2B and Modal.'
+    link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/sprites_sandbox/_capability.py 'SpritesSandbox source at starting revision'
+    link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/shell/_capability.py 'Shell capability at starting revision'
+
+    include externals.application, repo.slim.agent, repo.slim.loop, repo.slim.workspaces, repo.harness.coding.shell, repo.harness.execution.sprites_sandbox, externals.h_sprites_sdk, externals.h_sprites_service, externals.command, externals.filesystem
+  }
+
+  dynamic view mcp_stdio_client {
+    #scenario, #interface
+    title 'Client-side MCP over stdio'
+    description 'The application configures an MCP client toolset that launches a local MCP server process over stdio. The client and server are optional run integrations.'
+    link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/mcp.py 'MCP client and transports at starting revision'
+    link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/docs/mcp/client.md 'MCP client documentation at starting revision'
+
+    externals.application -> repo.slim.agent 'configures an MCP client toolset'
+    repo.slim.agent -> repo.slim.loop 'runs the configured agent'
+    repo.slim.loop -> repo.slim.toolsets 'dispatches the MCP tool call'
+    repo.slim.toolsets -> repo.slim.mcp 'calls the MCP client'
+    repo.slim.mcp -> externals.c_fastmcp_sdk 'uses the configured client transport'
+    externals.c_fastmcp_sdk -> externals.mcp_stdio 'launches and communicates over stdio'
+    externals.mcp_stdio -> externals.c_fastmcp_sdk 'returns the MCP tool result'
+    externals.c_fastmcp_sdk -> repo.slim.mcp 'returns the client result'
+    repo.slim.mcp -> repo.slim.toolsets 'returns the tool result'
+    repo.slim.toolsets -> repo.slim.loop 'returns the normalized tool result'
+  }
+
+  dynamic view mcp_http_client {
+    #scenario, #interface
+    title 'Client-side MCP over HTTP'
+    description 'The application configures an MCP client toolset using an HTTP transport. The Pydantic AI process connects to the remote MCP server.'
+    link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/mcp.py 'MCP client and transports at starting revision'
+    link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/docs/mcp/client.md 'MCP client documentation at starting revision'
+
+    externals.application -> repo.slim.agent 'configures an MCP client toolset'
+    repo.slim.agent -> repo.slim.loop 'runs the configured agent'
+    repo.slim.loop -> repo.slim.toolsets 'dispatches the MCP tool call'
+    repo.slim.toolsets -> repo.slim.mcp 'calls the MCP client'
+    repo.slim.mcp -> externals.c_fastmcp_sdk 'uses the configured HTTP transport'
+    externals.c_fastmcp_sdk -> externals.mcp_http 'sends an MCP request'
+    externals.mcp_http -> externals.c_fastmcp_sdk 'returns the MCP response'
+    externals.c_fastmcp_sdk -> repo.slim.mcp 'returns the client result'
+    repo.slim.mcp -> repo.slim.toolsets 'returns the tool result'
+    repo.slim.toolsets -> repo.slim.loop 'returns the normalized tool result'
+  }
+
+  dynamic view provider_native_mcp {
+    #scenario, #interface
+    title 'Provider-native MCP'
+    description 'With MCPServerTool, the model provider connects to the configured remote MCP server and returns the tool result. This differs from MCPToolset, where the Pydantic AI process connects to the MCP server.'
+    link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/docs/native-tools.md#mcp-server-tool 'MCPServerTool documentation at starting revision'
+    link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/native_tools/__init__.py 'Native tool definitions at starting revision'
+
+    externals.application -> repo.slim.agent 'configures MCPServerTool'
+    repo.slim.agent -> repo.slim.loop 'runs the configured agent'
+    repo.slim.loop -> repo.slim.native_tools 'prepares the provider-native tool'
+    repo.slim.native_tools -> repo.slim.models 'supplies native tool parameters'
+    repo.slim.models -> externals.c_openai_sdk 'uses the configured OpenAI client'
+    externals.c_openai_sdk -> externals.c_openai_api 'sends the request with MCPServerTool configuration'
+    externals.c_openai_api -> externals.mcp_http 'connects to the configured MCP server'
+    externals.mcp_http -> externals.c_openai_api 'provides the MCP tool result to the provider'
+    externals.c_openai_api -> externals.c_openai_sdk 'returns the provider response'
+    externals.c_openai_sdk -> repo.slim.models 'decodes the provider response'
+    repo.slim.models -> repo.slim.loop 'returns the normalized response'
+  }
+
+  dynamic view browser_ui_stream {
+    #scenario, #interface
+    title 'Browser UI input and event stream'
+    description 'A browser sends a request through a configured UI adapter in the application. The adapter starts an agent run and encodes the run events for the selected UI protocol.'
+    link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/ui/ag_ui/_adapter.py 'AG-UI adapter at starting revision'
+    link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/ui/vercel_ai/_adapter.py 'Vercel AI adapter at starting revision'
+
+    externals.human -> externals.browser 'submits user input'
+    externals.browser -> repo.slim.ui 'sends a request in the selected UI protocol'
+    repo.slim.ui -> repo.slim.agent 'starts an agent run'
+    repo.slim.agent -> repo.slim.loop 'runs the agent graph'
+    repo.slim.loop -> repo.slim.messages 'produces normalized messages and events'
+    repo.slim.messages -> repo.slim.ui 'provides run events for encoding'
+    repo.slim.ui -> externals.browser 'streams protocol events'
+    externals.browser -> externals.human 'displays streamed updates'
+  }
+
+  view temporal_durability_scenario {
+    #scenario, #interface
+    title 'Temporal durability capability'
+    description 'Attach TemporalDurability to a normal Agent and run it inside an application-started Temporal workflow. Outside that workflow the run is not durable; use the async agent API inside workflows.'
+    link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/docs/durable_execution/temporal.md 'Temporal durability at starting revision'
+
+    include externals.application, repo.slim.agent, repo.slim.capabilities, repo.slim.durable, repo.slim.loop, repo.slim.models, repo.slim.toolsets, externals.c_temporal_sdk, externals.temporal_service
+  }
+
+  view dbos_durability_scenario {
+    #scenario, #interface
+    title 'DBOS durability capability'
+    description 'Attach DBOSDurability to a normal Agent and execute the run in DBOS workflow context. DBOS persists workflow state through its configured system database.'
+    link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/docs/durable_execution/dbos.md 'DBOS durability at starting revision'
+
+    include externals.application, repo.slim.agent, repo.slim.capabilities, repo.slim.durable, repo.slim.loop, repo.slim.models, repo.slim.toolsets, externals.c_dbos_sdk, externals.dbos_database
+  }
+
+  view prefect_durability_scenario {
+    #scenario, #interface
+    title 'Prefect durability capability'
+    description 'Attach PrefectDurability to a normal Agent and call Agent.run inside an application-defined Prefect flow. Attaching the capability alone does not make a direct run durable.'
+    link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/docs/durable_execution/prefect.md 'Prefect durability at starting revision'
+
+    include externals.application, repo.slim.agent, repo.slim.capabilities, repo.slim.durable, repo.slim.loop, repo.slim.models, repo.slim.toolsets, externals.c_prefect_sdk, externals.prefect_service
+  }
+
+  view opt_in_telemetry_content {
+    #scenario, #interface
+    title 'Opt-in telemetry and content settings'
+    description 'Instrumentation is configured on the agent or globally. The application selects the telemetry exporter and whether message content is included; include_content=false omits prompt and completion content, tool arguments, and tool results.'
+    link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/docs/logfire.md#excluding-prompts-and-completions 'Telemetry content settings at starting revision'
+    link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/capabilities/instrumentation.py 'Instrumentation capability at starting revision'
+
+    include externals.application, repo.slim.agent, repo.slim.capabilities, repo.slim.telemetry, repo.slim.loop, repo.slim.models, repo.slim.tools, externals.collector
+  }
+}

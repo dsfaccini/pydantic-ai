@@ -1,0 +1,275 @@
+model {
+  repo = repository 'Pydantic AI monorepo' {
+    description 'The source repository for Pydantic AI, its supporting packages, examples, harness capabilities, and CLAI 2. This architecture snapshot is based on upstream commit 001ed141fd1057d0035557353f87559eced5b0a7.'
+    link https://github.com/pydantic/pydantic-ai/tree/001ed141fd1057d0035557353f87559eced5b0a7 'Source at starting revision'
+
+    bundle = package 'pydantic-ai distribution' {
+      description 'The umbrella distribution. Its required dependencies install pydantic-ai-slim with a default set of provider and integration extras; implementation lives in the workspace packages.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pyproject.toml 'Package manifest'
+      metadata { source_path 'pyproject.toml' public_module 'pydantic_ai' }
+    }
+    slim = package 'pydantic-ai-slim' {
+      description 'The core agent framework distribution with optional provider and integration extras. It owns Agent, the agent loop, model protocols, and reusable runtime primitives.'
+      link https://github.com/pydantic/pydantic-ai/tree/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim 'Package source'
+
+      agent = subsystem 'Agent API' {
+        description 'Public agent construction and run APIs. Agent prepares each run and coordinates configured capabilities, model, toolsets, history, and optional workspace.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/agent/__init__.py 'Source at starting revision'
+        metadata { source_path 'pydantic_ai_slim/pydantic_ai/agent/__init__.py' public_module 'pydantic_ai.Agent' }
+      }
+      loop = subsystem 'Agent loop' {
+        description 'Graph nodes orchestrate prompt assembly, model requests, tool and output processing, retries, usage checks, and run finalization.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/_agent_graph.py 'Source at starting revision'
+        metadata { source_path 'pydantic_ai_slim/pydantic_ai/_agent_graph.py' public_module 'pydantic_graph' }
+      }
+      messages = subsystem 'Normalized messages' {
+        description 'Provider-neutral request, response, part, and event shapes used by model adapters, history, and UI protocols.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/messages.py 'Source at starting revision'
+        metadata { source_path 'pydantic_ai_slim/pydantic_ai/messages.py' public_module 'pydantic_ai.messages' }
+      }
+      tools = subsystem 'Tools' {
+        description 'Function tool definitions, validation, invocation, retries, approval and deferral semantics, and tool-manager coordination.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/tools.py 'Source at starting revision'
+        metadata { source_path 'pydantic_ai_slim/pydantic_ai/tools.py' public_module 'pydantic_ai.tools' }
+      }
+      toolsets = subsystem 'Toolsets' {
+        description 'Composable collections of tools, including function, MCP, external, and wrapper toolsets with stable tool identity and lifecycle.'
+        link https://github.com/pydantic/pydantic-ai/tree/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/toolsets 'Source at starting revision'
+        metadata { source_path 'pydantic_ai_slim/pydantic_ai/toolsets/' public_module 'pydantic_ai.toolsets' }
+      }
+      capabilities = subsystem 'Capabilities' {
+        description 'Composable hooks and policies that extend agent runs, models, tools, output, events, and histories through framework extension points.'
+        link https://github.com/pydantic/pydantic-ai/tree/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/capabilities 'Source at starting revision'
+        metadata { source_path 'pydantic_ai_slim/pydantic_ai/capabilities/' public_module 'pydantic_ai.capabilities' }
+      }
+      output = subsystem 'Output' {
+        description 'Public output modes and validation surface, with internal schema preparation and result processing in the agent loop.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/output.py 'Source at starting revision'
+        metadata { source_path 'pydantic_ai_slim/pydantic_ai/output.py' public_module 'pydantic_ai.output' }
+      }
+      models = subsystem 'Model adapters' {
+        description 'Translate normalized requests and responses to provider wire formats and implement request, streaming, and token-counting behavior for each model family.'
+        link https://github.com/pydantic/pydantic-ai/tree/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/models 'Source at starting revision'
+        metadata { source_path 'pydantic_ai_slim/pydantic_ai/models/' public_module 'pydantic_ai.models' }
+      }
+      providers = subsystem 'Providers' {
+        description 'Own provider authentication, clients, base URLs, HTTP lifecycle, and provider-level model and profile inference.'
+        link https://github.com/pydantic/pydantic-ai/tree/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/providers 'Source at starting revision'
+        metadata { source_path 'pydantic_ai_slim/pydantic_ai/providers/' public_module 'pydantic_ai.providers' }
+      }
+      profiles = subsystem 'Model profiles' {
+        description 'Describe model-family behavior such as structured-output defaults, native tool support, thinking support, and schema constraints.'
+        link https://github.com/pydantic/pydantic-ai/tree/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/profiles 'Source at starting revision'
+        metadata { source_path 'pydantic_ai_slim/pydantic_ai/profiles/' public_module 'pydantic_ai.profiles' }
+      }
+      workspaces = subsystem 'Workspace primitives' {
+        description 'Define Workspace, WorkspaceBackend, WorkspaceRef, local and read-only backends, and filesystem and command protocols. Remote sandbox implementations are supplied by harness integrations.'
+        link https://github.com/pydantic/pydantic-ai/tree/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/workspaces 'Source at starting revision'
+        metadata { source_path 'pydantic_ai_slim/pydantic_ai/workspaces/' public_module 'pydantic_ai.workspaces' }
+      }
+      durable = capability 'Durable execution' {
+        description 'Core durable-execution adapters and capability contracts. Users opt into TemporalDurability, DBOSDurability, or PrefectDurability capabilities; wrapper agents are deprecated.'
+        link https://github.com/pydantic/pydantic-ai/tree/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/durable_exec 'Source at starting revision'
+        metadata { source_path 'pydantic_ai_slim/pydantic_ai/durable_exec/' public_module 'pydantic_ai.durable_exec' }
+      }
+      ui = subsystem 'UI adapters' {
+        description 'Translate normalized messages and agent events to frontend protocols such as AG-UI and Vercel AI SDK data streams.'
+        link https://github.com/pydantic/pydantic-ai/tree/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/ui 'Source at starting revision'
+        metadata { source_path 'pydantic_ai_slim/pydantic_ai/ui/' public_module 'pydantic_ai.ui' }
+      }
+      mcp = subsystem 'MCP client and toolsets' {
+        description 'Connect MCP toolsets to in-process servers, child processes over stdio, or configured remote HTTP transports.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/mcp.py 'Source at starting revision'
+        metadata { source_path 'pydantic_ai_slim/pydantic_ai/mcp.py' public_module 'pydantic_ai.mcp' }
+      }
+      telemetry = subsystem 'Telemetry' {
+        description 'Instrument agent, model, and tool activity with OpenTelemetry and export through configured instrumentation integrations.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/_instrumentation.py 'Source at starting revision'
+        metadata { source_path 'pydantic_ai_slim/pydantic_ai/_instrumentation.py' public_module 'pydantic_ai.Agent' }
+      }
+      native_tools = subsystem 'Native tools' {
+        description 'Represent provider-native tools and their normalized declarations and results, including hosted search and code-execution tools.'
+        link https://github.com/pydantic/pydantic-ai/tree/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/native_tools 'Source at starting revision'
+        metadata { source_path 'pydantic_ai_slim/pydantic_ai/native_tools/' public_module 'pydantic_ai.native_tools' }
+      }
+      embeddings = subsystem 'Embeddings' {
+        description 'Embedding model interface, provider adapters, results, settings, and wrappers for remote and local embedding implementations.'
+        link https://github.com/pydantic/pydantic-ai/tree/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/embeddings 'Source at starting revision'
+        metadata { source_path 'pydantic_ai_slim/pydantic_ai/embeddings/' public_module 'pydantic_ai.embeddings' }
+      }
+      realtime = subsystem 'Realtime models' {
+        description 'Realtime audio and conversation sessions, model adapters, protocol codecs, and connection lifecycle for supported providers.'
+        link https://github.com/pydantic/pydantic-ai/tree/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/realtime 'Source at starting revision'
+        metadata { source_path 'pydantic_ai_slim/pydantic_ai/realtime/' public_module 'pydantic_ai.realtime' }
+      }
+      specs = subsystem 'Agent specifications' {
+        description 'Serializable AgentSpec data and loading paths for constructing agents from validated specifications.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/agent/spec.py 'Source at starting revision'
+        metadata { source_path 'pydantic_ai_slim/pydantic_ai/agent/spec.py' public_module 'pydantic_ai.AgentSpec' }
+      }
+    }
+
+    graph = package 'pydantic-graph' {
+      description 'The type-hint-based graph library used by the agent loop and available as a workspace distribution.'
+      link https://github.com/pydantic/pydantic-ai/tree/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_graph 'Package source'
+      metadata { source_path 'pydantic_graph/' public_module 'pydantic_graph' }
+    }
+    evals = package 'pydantic-evals' {
+      description 'Evaluation primitives for measuring arbitrary deterministic and stochastic functions, including agents.'
+      link https://github.com/pydantic/pydantic-ai/tree/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_evals 'Package source'
+      metadata { source_path 'pydantic_evals/' public_module 'pydantic_evals' }
+    }
+    harness = package 'pydantic-ai-harness' {
+      description 'Reusable capabilities and coding-agent workflows built on the public core primitives of Pydantic AI.'
+      link https://github.com/pydantic/pydantic-ai/tree/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness 'Package source'
+      metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/' public_module 'pydantic_ai_harness' }
+    }
+    clai = package 'CLAI' {
+      description 'The original command-line client, distributed separately and installed against the umbrella pydantic-ai distribution.'
+      link https://github.com/pydantic/pydantic-ai/tree/001ed141fd1057d0035557353f87559eced5b0a7/clai 'Package source'
+      metadata { source_path 'clai/' public_module 'clai' }
+    }
+    clai2 = package 'CLAI 2' {
+      description 'Capability-aware terminal client built on pydantic-ai-harness and the slim framework.'
+      link https://github.com/pydantic/pydantic-ai/tree/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_clai2 'Package source'
+      metadata { source_path 'src/pydantic_clai2/pydantic_clai2/' public_module 'pydantic_clai2' }
+    }
+    examples = package 'Pydantic AI examples' {
+      description 'Installable examples package with runnable demonstrations of agents, providers, UI, and application integrations.'
+      link https://github.com/pydantic/pydantic-ai/tree/001ed141fd1057d0035557353f87559eced5b0a7/examples 'Package source'
+      metadata { source_path 'examples/pydantic_ai_examples/' public_module 'pydantic_ai_examples' }
+    }
+  }
+
+  externals = subsystem 'External libraries and runtime systems' {
+    description 'Optional SDKs, services, host processes, actors, and storage that can participate in configured applications. Participants may share a process, run locally, or run remotely; this grouping does not imply isolation or a required deployment.'
+    link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pyproject.toml 'Integration dependencies'
+
+    application = process 'Application process' {
+      description 'The user application that constructs agents and selects providers, models, capabilities, toolsets, and optional integrations. It may share a process with the framework.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/agent/__init__.py 'Agent API boundary'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/agent/__init__.py' public_module 'pydantic_ai.Agent' }
+    }
+    human = actor 'Human user' {
+      description 'A person interacting through an application or user interface. Whether an agent has a human participant is application-configured.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/docs/agent.md 'Agent usage'
+      metadata { source_path 'docs/agent.md' public_module 'pydantic_ai.Agent' }
+    }
+    browser = process 'Browser process' {
+      description 'An optional browser host that consumes a supported UI protocol; the framework does not require a browser.'
+      link https://github.com/pydantic/pydantic-ai/tree/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/ui 'UI protocol adapters'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/ui/' public_module 'pydantic_ai.ui' }
+    }
+    filesystem = storage 'Filesystem' {
+      description 'A filesystem exposed by a configured local or remote workspace backend. Core defines the protocol and local implementation; harness packages can provide remote sandboxes.'
+      link https://github.com/pydantic/pydantic-ai/tree/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/workspaces 'Workspace contracts and local backend'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/workspaces/' public_module 'pydantic_ai.workspaces' }
+    }
+    command = process 'Command process' {
+      description 'A process used by a configured workspace command backend. Command execution depends on the supplied backend and deployment.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/workspaces/protocol.py 'Workspace command protocol'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/workspaces/protocol.py' public_module 'pydantic_ai.workspaces.WorkspaceCommand' }
+    }
+    mcp_stdio = process 'MCP server over stdio' {
+      description 'An optional MCP server process launched through a configured stdio transport.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/mcp.py 'MCP client transports'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/mcp.py' public_module 'pydantic_ai.mcp.MCPToolset' }
+    }
+    mcp_http = service 'MCP server over HTTP' {
+      description 'An optional remote MCP server reached through a configured HTTP transport.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/mcp.py 'MCP client transports'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/mcp.py' public_module 'pydantic_ai.mcp.MCPToolset' }
+    }
+    mcp_inprocess = library 'In-process MCP server' {
+      description 'An optional server object in the same process, accepted by MCP client toolsets when server-side MCP packages are installed.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/mcp.py 'In-process MCP support'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/mcp.py' public_module 'pydantic_ai.mcp.MCPToolset' }
+    }
+    collector = service 'Telemetry collector' {
+      description 'An optional OpenTelemetry collector or backend configured by instrumentation and exporters configured by the application.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/_instrumentation.py 'Instrumentation source'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/_instrumentation.py' public_module 'pydantic_ai.Agent' }
+    }
+    temporal_service = service 'Temporal service' {
+      description 'A Temporal cluster used when an application configures TemporalDurability and supplies a Temporal client and worker.'
+      link https://github.com/pydantic/pydantic-ai/tree/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/durable_exec/temporal 'Temporal durability adapter'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/durable_exec/temporal/' public_module 'pydantic_ai.durable_exec.temporal.TemporalDurability' }
+    }
+    dbos_database = storage 'DBOS system database' {
+      description 'DBOS durable execution persists workflow state through its configured system database.'
+      link https://github.com/pydantic/pydantic-ai/tree/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/durable_exec/dbos 'DBOS durability adapter'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/durable_exec/dbos/' public_module 'pydantic_ai.durable_exec.dbos.DBOSDurability' }
+    }
+    prefect_service = service 'Prefect service' {
+      description 'A Prefect server or cloud deployment used when an application configures PrefectDurability and its worker or client.'
+      link https://github.com/pydantic/pydantic-ai/tree/001ed141fd1057d0035557353f87559eced5b0a7/pydantic_ai_slim/pydantic_ai/durable_exec/prefect 'Prefect durability adapter'
+      metadata { source_path 'pydantic_ai_slim/pydantic_ai/durable_exec/prefect/' public_module 'pydantic_ai.durable_exec.prefect.PrefectDurability' }
+    }
+  }
+
+  repo.bundle -[depends_on]-> repo.slim 'required dependency with default extras'
+  repo.bundle -[depends_on]-> repo.examples 'optional examples extra'
+  repo.slim -[depends_on]-> repo.graph 'workspace dependency'
+  repo.evals -[depends_on]-> repo.slim 'workspace dependency'
+  repo.examples -[depends_on]-> repo.slim 'workspace dependency'
+  repo.examples -[depends_on]-> repo.evals 'workspace dependency'
+  repo.harness -[depends_on]-> repo.slim 'workspace dependency'
+  repo.clai -[depends_on]-> repo.bundle 'workspace dependency'
+  repo.clai2 -[depends_on]-> repo.harness 'workspace dependency'
+  repo.clai2 -[depends_on]-> repo.slim 'workspace dependency'
+
+  repo.slim.agent -[calls]-> repo.slim.loop 'enters graph-backed run'
+  repo.slim.loop -[calls]-> repo.slim.messages 'assembles and processes normalized history'
+  repo.slim.loop -[calls]-> repo.slim.tools 'executes function tools'
+  repo.slim.loop -[calls]-> repo.slim.toolsets 'selects and runs toolsets'
+  repo.slim.loop -[calls]-> repo.slim.models 'requests model responses'
+  repo.slim.agent -[configures]-> repo.slim.capabilities 'attaches run capabilities'
+  repo.slim.loop -[calls]-> repo.slim.output 'validates and finalizes output'
+  repo.slim.models -[depends_on]-> repo.slim.providers 'uses configured provider clients'
+  repo.slim.models -[depends_on]-> repo.slim.profiles 'reads model-family profiles'
+  repo.slim.providers -[configures]-> repo.slim.profiles 'resolves provider-level profile facts'
+  repo.slim.capabilities -[configures]-> repo.slim.workspaces 'selects workspace behavior'
+  repo.slim.agent -[configures]-> repo.slim.workspaces 'accepts an optional workspace'
+  repo.slim.capabilities -[configures]-> repo.slim.durable 'attaches durable execution capabilities'
+  repo.slim.durable -[extends_]-> repo.slim.capabilities 'implements the capability lifecycle'
+  repo.slim.toolsets -[depends_on]-> repo.slim.mcp 'uses MCP client transports'
+  repo.slim.mcp -[depends_on]-> repo.slim.messages 'maps protocol content to normalized parts'
+  repo.slim.ui -[depends_on]-> repo.slim.messages 'translates normalized messages and events'
+  repo.slim.native_tools -[depends_on]-> repo.slim.models 'maps native tools through model adapters'
+  repo.slim.telemetry -[emits]-> externals.collector 'exports when telemetry is configured'
+  repo.slim.workspaces -[reads_writes]-> externals.filesystem 'uses a configured backend'
+  repo.slim.workspaces -[executes]-> externals.command 'when command support is configured'
+  repo.slim.durable -[depends_on]-> externals.c_temporal_sdk 'when TemporalDurability is configured'
+  repo.slim.durable -[depends_on]-> externals.c_dbos_sdk 'when DBOSDurability is configured'
+  repo.slim.durable -[depends_on]-> externals.c_prefect_sdk 'when PrefectDurability is configured'
+}
+
+views {
+    view index {
+      #overview
+      title 'Packages and repository'
+      description 'The workspace packages and their manifest-backed dependency edges. The umbrella pydantic-ai distribution is distinct from the slim implementation package.'
+      include repo, repo.bundle, repo.slim, repo.graph, repo.evals, repo.harness, repo.clai, repo.clai2, repo.examples
+    }
+
+    view core_ownership {
+      #core
+      title 'Core ownership map'
+      description 'Source-level ownership boundaries of the slim package. Select an element to inspect its source link, public module, and more focused views.'
+      include repo.slim, repo.slim.agent, repo.slim.loop, repo.slim.messages, repo.slim.tools, repo.slim.toolsets, repo.slim.capabilities, repo.slim.output, repo.slim.models, repo.slim.providers, repo.slim.profiles, repo.slim.workspaces, repo.slim.durable, repo.slim.ui, repo.slim.mcp, repo.slim.telemetry, repo.slim.native_tools, repo.slim.embeddings, repo.slim.realtime, repo.slim.specs
+    }
+
+    view core_runtime {
+      #core, #scenario
+      title 'Configurable agent runtime'
+      description 'A typical run crosses the Agent API, graph loop, toolsets, model adapter, and configured workspace. External processes, filesystems, and durable services are optional participants; nodes in externals may share a process or run separately.'
+      include repo.slim, repo.slim.agent, repo.slim.loop, repo.slim.messages, repo.slim.models, repo.slim.providers, repo.slim.profiles, repo.slim.toolsets, repo.slim.capabilities, repo.slim.workspaces, repo.slim.durable, externals.application, externals.filesystem, externals.command, externals.c_temporal_sdk, externals.temporal_service, externals.c_dbos_sdk, externals.dbos_database, externals.c_prefect_sdk, externals.prefect_service
+    }
+
+    view core_external_interfaces {
+      #interface
+      title 'Core external interfaces'
+      description 'Optional interfaces exposed to application code: workspace backends, MCP transports, frontend protocols, and telemetry exporters. Interface scenarios are configurations selected by users, not a deployment where all integrations are active.'
+      include repo.slim, repo.slim.agent, repo.slim.workspaces, repo.slim.mcp, repo.slim.ui, repo.slim.telemetry, repo.slim.embeddings, repo.slim.realtime, repo.slim.specs, repo.slim.native_tools, externals.application, externals.human, externals.browser, externals.filesystem, externals.command, externals.mcp_stdio, externals.mcp_http, externals.mcp_inprocess, externals.collector, externals.c_fastmcp_sdk
+    }
+}

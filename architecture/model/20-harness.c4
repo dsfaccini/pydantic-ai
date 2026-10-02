@@ -1,0 +1,513 @@
+// Architecture inventory from the pinned source revision. Deprecated aliases under
+// pydantic_ai_harness.experimental (for example context, docs, subagents, planning,
+// media, compaction, dynamic_workflow, and overflow) are omitted in favor of their
+// current public modules; deprecated legacy class aliases are not separate nodes.
+model {
+  extend repo.harness {
+    coding = subsystem 'Coding capabilities' {
+      description 'Harness coding capabilities group; membership follows the repository\'s public capability modules.'
+      coder = capability 'Coder' {
+        description 'Composes workspace, repository context, subagent, compaction, output-limit, and repair capabilities for coding agents.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/coder/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/coder/_capability.py' public_module 'pydantic_ai_harness.coder' }
+      }
+      filesystem = capability 'Filesystem tools' {
+        description 'Adds tools that read and write through the run\'s configured workspace.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/filesystem/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/filesystem/_capability.py' public_module 'pydantic_ai_harness.filesystem' }
+      }
+      shell = capability 'Shell tools' {
+        description 'Runs commands through the run\'s configured workspace command backend.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/shell/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/shell/_capability.py' public_module 'pydantic_ai_harness.shell' }
+      }
+      repo_context = capability 'Repository context' {
+        description 'Loads repository context files and exposes them to agent runs.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/repo_context/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/repo_context/_capability.py' public_module 'pydantic_ai_harness.repo_context' }
+      }
+      skills = capability 'Agent skills' {
+        description 'Loads and exposes selected agent skills to a run.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/skills/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/skills/_capability.py' public_module 'pydantic_ai_harness.skills' }
+      }
+      pydantic_ai_docs = capability 'Pydantic AI documentation' {
+        description 'Provides tools for searching and consulting Pydantic AI documentation.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/pydantic_ai_docs/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/pydantic_ai_docs/_capability.py' public_module 'pydantic_ai_harness.pydantic_ai_docs' }
+      }
+      capability_creation = capability 'Capability creation' {
+        description 'Supports authoring, validating, and storing reusable capabilities.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/capability_creation/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/capability_creation/_capability.py' public_module 'pydantic_ai_harness.capability_creation' }
+      }
+      macroscope = capability 'Macroscope reviews' {
+        description 'Runs the configured Macroscope code-review workflow.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/macroscope/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/macroscope/_capability.py' public_module 'pydantic_ai_harness.macroscope' }
+      }
+    }
+
+    execution = subsystem 'Execution backends' {
+      description 'Harness execution backends group; membership follows the repository\'s public capability modules.'
+      code_mode = capability 'Code mode' {
+        description 'Executes selected tool calls through a restricted Python interface backed by Monty.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/code_mode/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/code_mode/_capability.py' public_module 'pydantic_ai_harness.code_mode' }
+      }
+      bubblewrap_sandbox = capability 'Bubblewrap sandbox' {
+        description 'Wraps workspace commands in a local Linux bubblewrap sandbox.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/bubblewrap_sandbox/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/bubblewrap_sandbox/_capability.py' public_module 'pydantic_ai_harness.bubblewrap_sandbox' }
+      }
+      e2b_sandbox = capability 'E2B sandbox' {
+        description 'Provides a remote workspace backed by a configured E2B sandbox.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/e2b_sandbox/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/e2b_sandbox/_capability.py' public_module 'pydantic_ai_harness.e2b_sandbox' }
+      }
+      modal_sandbox = capability 'Modal sandbox' {
+        description 'Provides a remote workspace backed by a configured Modal sandbox.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/modal_sandbox/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/modal_sandbox/_capability.py' public_module 'pydantic_ai_harness.modal_sandbox' }
+      }
+      sprites_sandbox = capability 'Sprites sandbox' {
+        description 'Provides a remote workspace backed by a configured Sprites environment.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/sprites_sandbox/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/sprites_sandbox/_capability.py' public_module 'pydantic_ai_harness.sprites_sandbox' }
+      }
+      ssh_workspace = capability 'SSH workspace' {
+        description 'Provides a remote workspace reached through the system OpenSSH client.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/ssh_workspace/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/ssh_workspace/_capability.py' public_module 'pydantic_ai_harness.ssh_workspace' }
+      }
+      localstack = capability 'LocalStack tools' {
+        description 'Provides tools for the application-configured LocalStack environment.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/localstack/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/localstack/_capability.py' public_module 'pydantic_ai_harness.localstack' }
+      }
+    }
+
+    coordination = subsystem 'Agent coordination' {
+      description 'Harness agent coordination group; membership follows the repository\'s public capability modules.'
+      advisor = capability 'Advisor' {
+        description 'Adds an advisor agent workflow for delegated guidance.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/advisor/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/advisor/_capability.py' public_module 'pydantic_ai_harness.advisor' }
+      }
+      ask_user = capability 'Ask the user' {
+        description 'Lets a run request and receive input from a human through the configured application.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/ask_user/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/ask_user/_capability.py' public_module 'pydantic_ai_harness.ask_user' }
+      }
+      background_tools = capability 'Background tools' {
+        description 'Runs selected tool calls in the background and reports their results.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/background_tools/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/background_tools/_capability.py' public_module 'pydantic_ai_harness.background_tools' }
+      }
+      dynamic_workflow = capability 'Dynamic workflows' {
+        description 'Coordinates sub-agents from a generated workflow.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/dynamic_workflow/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/dynamic_workflow/_capability.py' public_module 'pydantic_ai_harness.dynamic_workflow' }
+      }
+      planning = capability 'Planning' {
+        description 'Maintains and updates a plan during an agent run.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/planning/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/planning/_capability.py' public_module 'pydantic_ai_harness.planning' }
+      }
+      subagents = capability 'Sub-agents' {
+        description 'Delegates work to configured sub-agents.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/subagents/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/subagents/_capability.py' public_module 'pydantic_ai_harness.subagents' }
+      }
+    }
+
+    context = subsystem 'Context and persistence' {
+      description 'Harness context and persistence group; membership follows the repository\'s public capability modules.'
+      compaction = capability 'Context compaction' {
+        description 'Reduces or manages conversation context, including clearing stale tool results.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/compaction/__init__.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/compaction/__init__.py' public_module 'pydantic_ai_harness.compaction' }
+      }
+      conversation_search = capability 'Conversation search' {
+        description 'Searches the configured conversation history or archive.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/conversation_search/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/conversation_search/_capability.py' public_module 'pydantic_ai_harness.conversation_search' }
+      }
+      memory = capability 'Agent memory' {
+        description 'Reads and updates configured persistent agent memory.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/memory/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/memory/_capability.py' public_module 'pydantic_ai_harness.memory' }
+      }
+      step_persistence = capability 'Step persistence' {
+        description 'Persists run steps and snapshots through a configured step store.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/step_persistence/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/step_persistence/_capability.py' public_module 'pydantic_ai_harness.step_persistence' }
+      }
+      media = subsystem 'Media storage' {
+        description 'Supporting module that externalizes large message payloads for step persistence; it does not define an agent capability.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/media/__init__.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/media/__init__.py' public_module 'pydantic_ai_harness.media' }
+      }
+      tool_output_limits = capability 'Tool output limits' {
+        description 'Bounds large tool results and stores overflow through a configured store.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/tool_output_limits/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/tool_output_limits/_capability.py' public_module 'pydantic_ai_harness.tool_output_limits' }
+      }
+      system_reminders = capability 'System reminders' {
+        description 'Adds run-scoped reminders from configured application context.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/system_reminders/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/system_reminders/_capability.py' public_module 'pydantic_ai_harness.system_reminders' }
+      }
+      warn_on_cache_busts = capability 'Cache-bust warnings' {
+        description 'Identifies prompt changes that can reduce cache reuse.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/warn_on_cache_busts/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/warn_on_cache_busts/_capability.py' public_module 'pydantic_ai_harness.warn_on_cache_busts' }
+      }
+    }
+
+    safety = subsystem 'Safety and evaluation' {
+      description 'Harness safety and evaluation group; membership follows the repository\'s public capability modules.'
+      guardrails = capability 'Guardrails' {
+        description 'Applies configured input, output, and tool-call guardrails.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/guardrails/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/guardrails/_capability.py' public_module 'pydantic_ai_harness.guardrails' }
+      }
+      prompt_injection_defender = capability 'Prompt-injection defense' {
+        description 'Detects prompt-injection signals and applies the configured response.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/prompt_injection_defender/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/prompt_injection_defender/_capability.py' public_module 'pydantic_ai_harness.prompt_injection_defender' }
+      }
+      repair_tool_arguments = capability 'Tool-argument repair' {
+        description 'Repairs invalid tool arguments using the configured repair policy.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/repair_tool_arguments/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/repair_tool_arguments/_capability.py' public_module 'pydantic_ai_harness.repair_tool_arguments' }
+      }
+      tool_call_judge = capability 'Tool-call judge' {
+        description 'Evaluates tool calls with a configured judge.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/tool_call_judge/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/tool_call_judge/_capability.py' public_module 'pydantic_ai_harness.tool_call_judge' }
+      }
+      trajectory_judge = capability 'Trajectory judge' {
+        description 'Evaluates run trajectories with a configured judge.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/trajectory_judge/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/trajectory_judge/_capability.py' public_module 'pydantic_ai_harness.trajectory_judge' }
+      }
+      spend = capability 'Spend limits' {
+        description 'Tracks configured spend budgets and enforces limits.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/spend/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/spend/_capability.py' public_module 'pydantic_ai_harness.spend' }
+      }
+    }
+
+    web = subsystem 'Web and browser' {
+      description 'Harness web and browser group; membership follows the repository\'s public capability modules.'
+      browser_use = capability 'Browser Use' {
+        description 'Provides browser automation through the configured browser-use integration.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/browser_use/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/browser_use/_capability.py' public_module 'pydantic_ai_harness.browser_use' }
+      }
+      playwright = capability 'Playwright browser' {
+        description 'Provides browser automation through a configured Playwright browser.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/playwright/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/playwright/_capability.py' public_module 'pydantic_ai_harness.playwright' }
+      }
+      exa = capability 'Exa search' {
+        description 'Provides search and page retrieval through the Exa API.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/exa/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/exa/_capability.py' public_module 'pydantic_ai_harness.exa' }
+      }
+      researcher = capability 'Researcher' {
+        description 'Runs a research workflow using configured search and agent tools.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/researcher/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/researcher/_capability.py' public_module 'pydantic_ai_harness.researcher' }
+      }
+      youdotcom = capability 'You.com search' {
+        description 'Provides search and research tools through the You.com API.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/youdotcom/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/youdotcom/_capability.py' public_module 'pydantic_ai_harness.youdotcom' }
+      }
+    }
+
+    connectors = subsystem 'Service connectors' {
+      description 'Harness service connectors group; membership follows the repository\'s public capability modules.'
+      day_ai = capability 'Day AI' {
+        description 'Connects agent tools to the configured Day AI MCP server.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/day_ai/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/day_ai/_capability.py' public_module 'pydantic_ai_harness.day_ai' }
+      }
+      github = capability 'GitHub' {
+        description 'Connects agent tools to the configured GitHub MCP server.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/github/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/github/_capability.py' public_module 'pydantic_ai_harness.github' }
+      }
+      google_workspace = capability 'Google Workspace' {
+        description 'Connects agent tools to the configured Google Workspace MCP server.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/google_workspace/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/google_workspace/_capability.py' public_module 'pydantic_ai_harness.google_workspace' }
+      }
+      grain = capability 'Grain' {
+        description 'Connects agent tools to the configured Grain MCP server.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/grain/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/grain/_capability.py' public_module 'pydantic_ai_harness.grain' }
+      }
+      linear = capability 'Linear' {
+        description 'Connects agent tools to the configured Linear MCP server.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/linear/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/linear/_capability.py' public_module 'pydantic_ai_harness.linear' }
+      }
+      logfire_mcp = capability 'Logfire MCP' {
+        description 'Connects agent tools to the configured Logfire MCP server.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/logfire_mcp/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/logfire_mcp/_capability.py' public_module 'pydantic_ai_harness.logfire_mcp' }
+      }
+      notion = capability 'Notion' {
+        description 'Connects agent tools to the configured Notion MCP server.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/notion/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/notion/_capability.py' public_module 'pydantic_ai_harness.notion' }
+      }
+      ordinal = capability 'Ordinal' {
+        description 'Connects agent tools to the configured Ordinal MCP server.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/ordinal/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/ordinal/_capability.py' public_module 'pydantic_ai_harness.ordinal' }
+      }
+      posthog = capability 'PostHog' {
+        description 'Connects agent tools to the configured PostHog MCP server.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/posthog/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/posthog/_capability.py' public_module 'pydantic_ai_harness.posthog' }
+      }
+      pylon = capability 'Pylon' {
+        description 'Connects agent tools to the configured Pylon MCP server.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/pylon/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/pylon/_capability.py' public_module 'pydantic_ai_harness.pylon' }
+      }
+      slack = capability 'Slack' {
+        description 'Connects agent tools to the configured Slack MCP server.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/slack/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/slack/_capability.py' public_module 'pydantic_ai_harness.slack' }
+      }
+      stackone = capability 'StackOne' {
+        description 'Connects agent tools to the configured StackOne MCP server.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/stackone/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/stackone/_capability.py' public_module 'pydantic_ai_harness.stackone' }
+      }
+    }
+
+    operations = subsystem 'Operations and durability' {
+      description 'Harness operations and durability group; membership follows the repository\'s public capability modules.'
+      absurd = capability 'Absurd durability' {
+        description 'Provides durable execution using the Absurd runtime.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/absurd/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/absurd/_capability.py' public_module 'pydantic_ai_harness.absurd' }
+      }
+      aws_lambda = capability 'AWS Lambda durability' {
+        description 'Adapts runs to AWS Lambda durable execution.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/aws_lambda/_capability.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/aws_lambda/_capability.py' public_module 'pydantic_ai_harness.aws_lambda' }
+      }
+      logfire = capability 'Logfire managed prompts' {
+        description 'Loads managed prompts from configured Logfire settings.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/logfire/_managed_prompt.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/logfire/_managed_prompt.py' public_module 'pydantic_ai_harness.logfire' }
+      }
+    }
+
+    interoperability = subsystem 'Interoperability' {
+      description 'Harness interoperability group; membership follows the repository\'s public capability modules.'
+      experimental_acp = capability 'Agent Client Protocol' {
+        description 'Adapts Pydantic AI agents to the Agent Client Protocol.'
+        link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/experimental/acp/__init__.py 'Source at starting revision'
+        metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/experimental/acp/__init__.py' public_module 'pydantic_ai_harness.experimental.acp' }
+      }
+    }
+  }
+
+  extend externals {
+    h_monty = library 'Monty Python sandbox library' {
+      description 'The optional pydantic-monty runtime used by CodeMode to evaluate selected Python tool calls.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/code_mode/_toolset.py 'Source at starting revision'
+      metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/code_mode/_toolset.py' public_module 'pydantic_monty' }
+    }
+    h_e2b_sdk = library 'E2B Python SDK' {
+      description 'Client library used by the E2B workspace backend.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/e2b_sandbox/_backend.py 'Source at starting revision'
+      metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/e2b_sandbox/_backend.py' public_module 'e2b' }
+    }
+    h_e2b_service = service 'E2B sandbox service' {
+      description 'Remote sandbox service reached when an E2B backend is configured.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/e2b_sandbox/_backend.py 'Source at starting revision'
+      metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/e2b_sandbox/_backend.py' public_module 'E2BSandboxBackend' }
+    }
+    h_modal_sdk = library 'Modal Python SDK' {
+      description 'Client library used by the Modal workspace backend.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/modal_sandbox/_backend.py 'Source at starting revision'
+      metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/modal_sandbox/_backend.py' public_module 'modal' }
+    }
+    h_modal_service = service 'Modal sandbox service' {
+      description 'Remote Modal sandbox service reached when a Modal backend is configured.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/modal_sandbox/_backend.py 'Source at starting revision'
+      metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/modal_sandbox/_backend.py' public_module 'ModalSandboxBackend' }
+    }
+    h_sprites_sdk = library 'Sprites Python SDK' {
+      description 'Client library used by the Sprites workspace backend.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/sprites_sandbox/_backend.py 'Source at starting revision'
+      metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/sprites_sandbox/_backend.py' public_module 'sprites' }
+    }
+    h_sprites_service = service 'Sprites sandbox service' {
+      description 'Remote Sprites service reached when a Sprites backend is configured.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/sprites_sandbox/_backend.py 'Source at starting revision'
+      metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/sprites_sandbox/_backend.py' public_module 'SpritesSandboxBackend' }
+    }
+    h_bwrap = process 'bubblewrap executable' {
+      description 'Local Linux executable invoked by BubblewrapWorkspace on the host that runs it.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/bubblewrap_sandbox/_workspace.py 'Source at starting revision'
+      metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/bubblewrap_sandbox/_workspace.py' public_module 'BubblewrapWorkspace' }
+    }
+    h_ssh_client = process 'OpenSSH client process' {
+      description 'System ssh client started by SSHWorkspaceBackend to reach the configured remote host.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/ssh_workspace/_backend.py 'Source at starting revision'
+      metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/ssh_workspace/_backend.py' public_module 'SSHWorkspaceBackend' }
+    }
+    h_exa_sdk = library 'Exa Python SDK' {
+      description 'exa-py client library used by the Exa search toolset.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/exa/_toolset.py 'Source at starting revision'
+      metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/exa/_toolset.py' public_module 'exa_py.AsyncExa' }
+    }
+    h_exa_service = service 'Exa API' {
+      description 'Remote search and contents API reached when ExaSearch is configured with credentials.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/exa/_toolset.py 'Source at starting revision'
+      metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/exa/_toolset.py' public_module 'ExaSearch' }
+    }
+    h_step_store = storage 'Configured step store' {
+      description 'StepStore implementation selected by the application; built-in options include in-memory, file, and SQLite stores.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/step_persistence/_store.py 'Step-store implementations'
+      metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/step_persistence/_store.py' public_module 'pydantic_ai_harness.step_persistence.StepStore' }
+    }
+    h_media_store = storage 'Configured media store' {
+      description 'MediaStore implementation selected by the application; built-in options include disk, SQLite, S3, and MongoDB stores.'
+      link https://github.com/pydantic/pydantic-ai/blob/001ed141fd1057d0035557353f87559eced5b0a7/src/pydantic_ai_harness/pydantic_ai_harness/media/__init__.py 'Media-store implementations'
+      metadata { source_path 'src/pydantic_ai_harness/pydantic_ai_harness/media/__init__.py' public_module 'pydantic_ai_harness.media.MediaStore' }
+    }
+  }
+
+  repo.harness.coding -[depends_on]-> repo.slim.capabilities 'implemented through core capability extension points'
+  repo.harness.execution -[depends_on]-> repo.slim.capabilities 'implemented through core capability extension points'
+  repo.harness.coordination -[depends_on]-> repo.slim.capabilities 'implemented through core capability extension points'
+  repo.harness.context -[depends_on]-> repo.slim.capabilities 'implemented through core capability extension points'
+  repo.harness.safety -[depends_on]-> repo.slim.capabilities 'implemented through core capability extension points'
+  repo.harness.web -[depends_on]-> repo.slim.capabilities 'implemented through core capability extension points'
+  repo.harness.connectors -[depends_on]-> repo.slim.capabilities 'implemented through core capability extension points'
+  repo.harness.operations -[depends_on]-> repo.slim.capabilities 'implemented through core capability extension points'
+  repo.harness.interoperability -[depends_on]-> repo.slim.capabilities 'implemented through core capability extension points'
+  repo.harness.coding.coder -[configures]-> repo.harness.coding.filesystem 'always composed'
+  repo.harness.coding.coder -[configures]-> repo.harness.coding.shell 'always composed'
+  repo.harness.coding.coder -[configures]-> repo.harness.coding.repo_context 'when repository context is enabled'
+  repo.harness.coding.coder -[configures]-> repo.harness.coordination.subagents 'when sub-agents are enabled'
+  repo.harness.coding.coder -[configures]-> repo.harness.context.compaction 'composes ClearToolResults and WarnNearLimits'
+  repo.harness.coding.coder -[configures]-> repo.harness.context.tool_output_limits 'composes output limits'
+  repo.harness.coding.coder -[configures]-> repo.harness.safety.repair_tool_arguments 'composes tool-argument repair'
+  repo.harness.coding.filesystem -[calls]-> repo.slim.workspaces 'reads and writes through the configured workspace filesystem'
+  repo.harness.coding.shell -[calls]-> repo.slim.workspaces 'runs commands through the configured workspace backend'
+  repo.harness.execution.e2b_sandbox -[extends_]-> repo.slim.workspaces 'supplies a remote WorkspaceBackend'
+  repo.harness.execution.modal_sandbox -[extends_]-> repo.slim.workspaces 'supplies a remote WorkspaceBackend'
+  repo.harness.execution.sprites_sandbox -[extends_]-> repo.slim.workspaces 'supplies a remote WorkspaceBackend'
+  repo.harness.execution.bubblewrap_sandbox -[extends_]-> repo.slim.workspaces 'wraps a configured workspace command backend'
+  repo.harness.execution.ssh_workspace -[extends_]-> repo.slim.workspaces 'supplies a remote WorkspaceBackend'
+  repo.harness.execution.code_mode -[depends_on]-> externals.h_monty 'evaluates selected code through Monty'
+  repo.harness.execution.bubblewrap_sandbox -[executes]-> externals.h_bwrap 'when selected on a Linux host with bwrap installed'
+  repo.harness.execution.ssh_workspace -[executes]-> externals.h_ssh_client 'when SSHWorkspace is configured with a destination'
+  repo.harness.execution.e2b_sandbox -[depends_on]-> externals.h_e2b_sdk 'when E2B support is installed'
+  externals.h_e2b_sdk -[network]-> externals.h_e2b_service 'when E2BSandbox creates or attaches to a configured sandbox'
+  repo.harness.execution.modal_sandbox -[depends_on]-> externals.h_modal_sdk 'when Modal support is installed'
+  externals.h_modal_sdk -[network]-> externals.h_modal_service 'when ModalSandbox creates or attaches to a configured sandbox'
+  repo.harness.execution.sprites_sandbox -[depends_on]-> externals.h_sprites_sdk 'when Sprites support is installed'
+  externals.h_sprites_sdk -[network]-> externals.h_sprites_service 'when SpritesSandbox creates or attaches to a configured environment'
+  repo.harness.web.exa -[depends_on]-> externals.h_exa_sdk 'when ExaSearch is configured'
+  externals.h_exa_sdk -[network]-> externals.h_exa_service 'when ExaSearch has an API key or configured client'
+  repo.harness.context.step_persistence -[reads_writes]-> externals.h_step_store 'through its configured StepStore'
+  repo.harness.context.step_persistence -[calls]-> repo.harness.context.media 'externalizes and restores large message payloads'
+  repo.harness.context.media -[reads_writes]-> externals.h_media_store 'through the configured MediaStore'
+  repo.harness.connectors.day_ai -[depends_on]-> externals.c_fastmcp_sdk 'when configured to use its hosted MCP server'
+  repo.harness.connectors.github -[depends_on]-> externals.c_fastmcp_sdk 'when configured to use its hosted MCP server'
+  repo.harness.connectors.google_workspace -[depends_on]-> externals.c_fastmcp_sdk 'when configured to use its hosted MCP server'
+  repo.harness.connectors.grain -[depends_on]-> externals.c_fastmcp_sdk 'when configured to use its hosted MCP server'
+  repo.harness.connectors.linear -[depends_on]-> externals.c_fastmcp_sdk 'when configured to use its hosted MCP server'
+  repo.harness.connectors.logfire_mcp -[depends_on]-> externals.c_fastmcp_sdk 'when configured to use its hosted MCP server'
+  repo.harness.connectors.notion -[depends_on]-> externals.c_fastmcp_sdk 'when configured to use its hosted MCP server'
+  repo.harness.connectors.ordinal -[depends_on]-> externals.c_fastmcp_sdk 'when configured to use its hosted MCP server'
+  repo.harness.connectors.posthog -[depends_on]-> externals.c_fastmcp_sdk 'when configured to use its hosted MCP server'
+  repo.harness.connectors.pylon -[depends_on]-> externals.c_fastmcp_sdk 'when configured to use its hosted MCP server'
+  repo.harness.connectors.slack -[depends_on]-> externals.c_fastmcp_sdk 'when configured to use its hosted MCP server'
+  repo.harness.connectors.stackone -[depends_on]-> externals.c_fastmcp_sdk 'when configured to use its hosted MCP server'
+}
+
+views {
+    view harness_overview {
+      #overview
+      title 'Pydantic AI Harness'
+      description 'The fixed Harness capability subsystems. Open a subsystem view to inspect its modules and runtime neighbors.'
+      include repo.harness.coding, repo.harness.execution, repo.harness.coordination, repo.harness.context, repo.harness.safety, repo.harness.web, repo.harness.connectors, repo.harness.operations, repo.harness.interoperability
+    }
+
+    view harness_coding {
+      #harness
+      title 'Coding capabilities'
+      description 'Harness coding capabilities modules and their direct runtime neighbors.'
+      include repo.harness.coding, repo.harness.coding.coder, repo.harness.coding.filesystem, repo.harness.coding.shell, repo.harness.coding.repo_context, repo.harness.coding.skills, repo.harness.coding.pydantic_ai_docs, repo.harness.coding.capability_creation, repo.harness.coding.macroscope, repo.slim.capabilities, repo.slim.workspaces, repo.slim.tools, repo.harness.coordination.subagents, repo.harness.context.compaction, repo.harness.context.tool_output_limits, repo.harness.safety.repair_tool_arguments
+    }
+
+    view harness_execution {
+      #harness
+      title 'Execution backends'
+      description 'Harness execution backends modules and their direct runtime neighbors.'
+      include repo.harness.execution, repo.harness.execution.code_mode, repo.harness.execution.bubblewrap_sandbox, repo.harness.execution.e2b_sandbox, repo.harness.execution.modal_sandbox, repo.harness.execution.sprites_sandbox, repo.harness.execution.ssh_workspace, repo.harness.execution.localstack, repo.slim.capabilities, repo.slim.workspaces, externals.h_monty, externals.h_bwrap, externals.h_ssh_client, externals.h_e2b_sdk, externals.h_e2b_service, externals.h_modal_sdk, externals.h_modal_service, externals.h_sprites_sdk, externals.h_sprites_service
+    }
+
+    view harness_coordination {
+      #harness
+      title 'Agent coordination'
+      description 'Harness agent coordination modules and their direct runtime neighbors.'
+      include repo.harness.coordination, repo.harness.coordination.advisor, repo.harness.coordination.ask_user, repo.harness.coordination.background_tools, repo.harness.coordination.dynamic_workflow, repo.harness.coordination.planning, repo.harness.coordination.subagents, repo.slim.capabilities
+    }
+
+    view harness_context {
+      #harness
+      title 'Context and persistence'
+      description 'Harness context and persistence modules and their direct runtime neighbors.'
+      include repo.harness.context, repo.harness.context.compaction, repo.harness.context.conversation_search, repo.harness.context.memory, repo.harness.context.step_persistence, repo.harness.context.media, repo.harness.context.tool_output_limits, repo.harness.context.system_reminders, repo.harness.context.warn_on_cache_busts, repo.slim.capabilities, repo.slim.agent, repo.slim.messages, externals.h_step_store, externals.h_media_store
+    }
+
+    view harness_safety {
+      #harness
+      title 'Safety and evaluation'
+      description 'Harness safety and evaluation modules and their direct runtime neighbors.'
+      include repo.harness.safety, repo.harness.safety.guardrails, repo.harness.safety.prompt_injection_defender, repo.harness.safety.repair_tool_arguments, repo.harness.safety.tool_call_judge, repo.harness.safety.trajectory_judge, repo.harness.safety.spend, repo.slim.capabilities
+    }
+
+    view harness_web {
+      #harness
+      title 'Web and browser'
+      description 'Harness web and browser modules and their direct runtime neighbors.'
+      include repo.harness.web, repo.harness.web.browser_use, repo.harness.web.playwright, repo.harness.web.exa, repo.harness.web.researcher, repo.harness.web.youdotcom, repo.slim.capabilities, externals.h_exa_sdk, externals.h_exa_service
+    }
+
+    view harness_connectors {
+      #harness
+      title 'Service connectors'
+      description 'Harness service connectors modules and their direct runtime neighbors.'
+      include repo.harness.connectors, repo.harness.connectors.day_ai, repo.harness.connectors.github, repo.harness.connectors.google_workspace, repo.harness.connectors.grain, repo.harness.connectors.linear, repo.harness.connectors.logfire_mcp, repo.harness.connectors.notion, repo.harness.connectors.ordinal, repo.harness.connectors.posthog, repo.harness.connectors.pylon, repo.harness.connectors.slack, repo.harness.connectors.stackone, repo.slim.capabilities, repo.slim.mcp, externals.c_fastmcp_sdk, externals.mcp_http
+    }
+
+    view harness_operations {
+      #harness
+      title 'Operations and durability'
+      description 'Harness operations and durability modules and their direct runtime neighbors.'
+      include repo.harness.operations, repo.harness.operations.absurd, repo.harness.operations.aws_lambda, repo.harness.operations.logfire, repo.slim.capabilities
+    }
+
+    view harness_interoperability {
+      #harness
+      title 'Interoperability'
+      description 'Harness interoperability modules and their direct runtime neighbors.'
+      include repo.harness.interoperability, repo.harness.interoperability.experimental_acp, repo.slim.capabilities
+    }
+}
