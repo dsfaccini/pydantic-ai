@@ -2189,6 +2189,9 @@ jobs:
           docker exec redis-cluster redis-cli -p 6380 cluster addslotsrange 0 16383
           until docker exec redis-cluster redis-cli -p 6380 cluster info | grep -q cluster_state:ok; do sleep 1; done
 
+      - name: Fail on purpose to verify the tag gate
+        run: exit 1
+
       - run: make integration-redis
 
   harness-azure-durable-task-integration:
